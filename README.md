@@ -1,2 +1,2 @@
 # hello-world
-no idea what this repository is about
+I have just made some changes to it.
