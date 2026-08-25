@@ -1,0 +1,2 @@
+# Keep committed promotion evidence; ignore only local scratch if needed.
+# last_eval_report.json and *-current.json are intentional portfolio artifacts.

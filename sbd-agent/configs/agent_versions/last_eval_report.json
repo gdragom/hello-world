@@ -1,0 +1,261 @@
+{
+  "suite": "sbd-golden",
+  "n_cases": 6,
+  "prompt_version": "v1.1.0",
+  "agent_version": "v1.1.0",
+  "quality": {
+    "requirement_coverage": 1.0,
+    "retrieval_recall_at_5": 0.875,
+    "faithfulness": 1.0,
+    "risk_accuracy": 0.75
+  },
+  "latency": {
+    "p50_ms": 2.62,
+    "p95_ms": 2.85,
+    "avg_ms": 2.59
+  },
+  "cost": {
+    "avg_usd_per_run": 0.00049,
+    "total_usd": 0.002942,
+    "avg_tokens_per_run": 788.5
+  },
+  "details": [
+    {
+      "id": "g1-internal-wiki",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 1.0,
+      "faithfulness": 1.0,
+      "risk_accuracy": 1.0,
+      "predicted_risk": "low",
+      "expected_risk": "low",
+      "latency_ms": 2.91,
+      "estimated_cost_usd": 0.000402,
+      "total_tokens": 681.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "low",
+        "score": 0.38,
+        "method": "classical",
+        "factors": [
+          "tech_count=2.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "low",
+        "score": 0.15,
+        "method": "llm",
+        "factors": []
+      }
+    },
+    {
+      "id": "g2-customer-portal",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 0.75,
+      "faithfulness": 1.0,
+      "risk_accuracy": 0.5,
+      "predicted_risk": "critical",
+      "expected_risk": "high",
+      "latency_ms": 2.68,
+      "estimated_cost_usd": 0.000509,
+      "total_tokens": 807.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "critical",
+        "score": 0.668,
+        "method": "classical",
+        "factors": [
+          "internet_facing=1.0",
+          "handles_pii=1.0",
+          "vendor_count=1.0",
+          "tech_count=3.0",
+          "class_restricted=1.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "critical",
+        "score": 1.0,
+        "method": "llm",
+        "factors": [
+          "internet_facing",
+          "handles_pii",
+          "third_party_vendors",
+          "classification:confidential"
+        ]
+      }
+    },
+    {
+      "id": "g3-sbd-ai-agent",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 1.0,
+      "faithfulness": 1.0,
+      "risk_accuracy": 1.0,
+      "predicted_risk": "critical",
+      "expected_risk": "critical",
+      "latency_ms": 2.59,
+      "estimated_cost_usd": 0.000557,
+      "total_tokens": 884.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "critical",
+        "score": 0.863,
+        "method": "classical",
+        "factors": [
+          "handles_pii=1.0",
+          "vendor_count=1.0",
+          "tech_count=4.0",
+          "class_restricted=1.0",
+          "mentions_ai=1.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "critical",
+        "score": 0.85,
+        "method": "llm",
+        "factors": [
+          "handles_pii",
+          "third_party_vendors",
+          "classification:restricted",
+          "ai_components"
+        ]
+      }
+    },
+    {
+      "id": "g4-k8s-payments",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 0.75,
+      "faithfulness": 1.0,
+      "risk_accuracy": 1.0,
+      "predicted_risk": "critical",
+      "expected_risk": "critical",
+      "latency_ms": 2.64,
+      "estimated_cost_usd": 0.000547,
+      "total_tokens": 840.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "critical",
+        "score": 0.754,
+        "method": "classical",
+        "factors": [
+          "internet_facing=1.0",
+          "handles_pii=1.0",
+          "vendor_count=1.0",
+          "tech_count=3.0",
+          "class_restricted=1.0",
+          "mentions_ai=1.0",
+          "mentions_cloud=1.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "critical",
+        "score": 1.0,
+        "method": "llm",
+        "factors": [
+          "internet_facing",
+          "handles_pii",
+          "third_party_vendors",
+          "classification:restricted",
+          "ai_components"
+        ]
+      }
+    },
+    {
+      "id": "g5-powerbi-ops",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 1.0,
+      "faithfulness": 1.0,
+      "risk_accuracy": 0.5,
+      "predicted_risk": "low",
+      "expected_risk": "medium",
+      "latency_ms": 2.29,
+      "estimated_cost_usd": 0.00044,
+      "total_tokens": 756.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "medium",
+        "score": 0.519,
+        "method": "classical",
+        "factors": [
+          "tech_count=2.0",
+          "class_restricted=1.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "low",
+        "score": 0.3,
+        "method": "llm",
+        "factors": [
+          "classification:confidential"
+        ]
+      }
+    },
+    {
+      "id": "g6-vendor-hr",
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 0.75,
+      "faithfulness": 1.0,
+      "risk_accuracy": 0.5,
+      "predicted_risk": "critical",
+      "expected_risk": "high",
+      "latency_ms": 2.45,
+      "estimated_cost_usd": 0.000487,
+      "total_tokens": 763.0,
+      "prompt_version": "v1.1.0",
+      "classical_risk": {
+        "level": "high",
+        "score": 0.643,
+        "method": "classical",
+        "factors": [
+          "internet_facing=1.0",
+          "handles_pii=1.0",
+          "vendor_count=1.0",
+          "tech_count=1.0",
+          "class_restricted=1.0"
+        ]
+      },
+      "llm_risk": {
+        "level": "critical",
+        "score": 1.0,
+        "method": "llm",
+        "factors": [
+          "internet_facing",
+          "handles_pii",
+          "third_party_vendors",
+          "classification:confidential"
+        ]
+      }
+    }
+  ],
+  "slo": {
+    "version": "1.0",
+    "latency": {
+      "p50_ms_max": 800,
+      "p95_ms_max": 2500,
+      "hard_timeout_ms": 5000
+    },
+    "cost": {
+      "max_avg_usd_per_run": 0.05,
+      "max_total_usd_per_eval_suite": 2.0,
+      "max_avg_tokens_per_run": 4000
+    },
+    "quality": {
+      "min_requirement_coverage": 0.75,
+      "min_retrieval_recall_at_5": 0.7,
+      "min_risk_accuracy": 0.7,
+      "min_faithfulness": 0.8
+    },
+    "promotion": {
+      "required_gates": [
+        "quality",
+        "latency",
+        "cost"
+      ],
+      "environments": [
+        "dev",
+        "staging",
+        "prod"
+      ]
+    }
+  },
+  "gates_passed": true,
+  "failed_gates": []
+}

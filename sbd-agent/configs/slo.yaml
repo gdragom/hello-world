@@ -1,0 +1,32 @@
+# Cost and latency service-level objectives for the SbD agent.
+# CI fails when measured aggregates breach these gates.
+
+version: "1.0"
+
+latency:
+  p50_ms_max: 800
+  p95_ms_max: 2500
+  hard_timeout_ms: 5000
+
+cost:
+  # Estimated USD per analysis at mock/heuristic pricing; raise when using live Foundry models.
+  max_avg_usd_per_run: 0.05
+  max_total_usd_per_eval_suite: 2.00
+  max_avg_tokens_per_run: 4000
+
+quality:
+  min_requirement_coverage: 0.75
+  min_retrieval_recall_at_5: 0.70
+  min_risk_accuracy: 0.70
+  min_faithfulness: 0.80
+
+promotion:
+  # Agent/prompt versions must pass all gates before promotion from staging → prod.
+  required_gates:
+    - quality
+    - latency
+    - cost
+  environments:
+    - dev
+    - staging
+    - prod

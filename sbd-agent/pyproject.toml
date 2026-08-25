@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sbd-agent"
+version = "0.1.0"
+description = "Production-shaped Security-by-Design multi-agent system with RAG, eval, and MLOps gates"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "langgraph>=0.2.0",
+  "langchain-core>=0.3.0",
+  "pydantic>=2.0.0",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.3.0",
+  "numpy>=1.24.0",
+  "rank-bm25>=0.2.2",
+  "joblib>=1.3.0",
+  "opentelemetry-api>=1.20.0",
+  "opentelemetry-sdk>=1.20.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4.0", "pytest-timeout>=2.2.0"]
+
+[project.scripts]
+sbd-analyze = "sbd_agent.cli:main"
+sbd-eval = "eval.harness:main"
+sbd-promote = "sbd_agent.mlops.promote:main"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sbd_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60
