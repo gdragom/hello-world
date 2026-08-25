@@ -1,0 +1,25 @@
+{
+  "version": "v1.1.0",
+  "environment": "staging",
+  "promoted_at": "2026-08-25T11:14:13.318993+00:00",
+  "eval_report": "configs/agent_versions/last_eval_report.json",
+  "gates_passed": true,
+  "metrics": {
+    "quality": {
+      "requirement_coverage": 1.0,
+      "retrieval_recall_at_5": 0.875,
+      "faithfulness": 1.0,
+      "risk_accuracy": 0.75
+    },
+    "latency": {
+      "p50_ms": 2.74,
+      "p95_ms": 3.31,
+      "avg_ms": 2.82
+    },
+    "cost": {
+      "avg_usd_per_run": 0.00049,
+      "total_usd": 0.002942,
+      "avg_tokens_per_run": 788.5
+    }
+  }
+}

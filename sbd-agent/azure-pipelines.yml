@@ -1,0 +1,53 @@
+# Azure DevOps pipeline — mirrors GitHub Actions eval gates for Foundry/ADO shops.
+
+trigger:
+  paths:
+    include:
+      - sbd-agent/*
+
+pr:
+  paths:
+    include:
+      - sbd-agent/*
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  workingDir: sbd-agent
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.11"
+
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install -e .
+    workingDirectory: $(workingDir)
+    displayName: Install dependencies
+
+  - script: pytest -q
+    workingDirectory: $(workingDir)
+    displayName: Unit tests
+
+  - script: |
+      python -m eval.harness \
+        --out configs/agent_versions/last_eval_report.json \
+        --fail-on-gate
+    workingDirectory: $(workingDir)
+    displayName: Golden-set evaluation gates
+
+  - script: |
+      python -m sbd_agent.mlops.promote \
+        --version v1.1.0 \
+        --env staging \
+        --eval-report configs/agent_versions/last_eval_report.json
+    workingDirectory: $(workingDir)
+    displayName: Promote agent version to staging
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(workingDir)/configs/agent_versions
+      artifact: sbd-eval-report

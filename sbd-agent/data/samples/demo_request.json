@@ -1,0 +1,11 @@
+{
+  "project_id": "demo-001",
+  "title": "Security-by-Design AI agent",
+  "description": "LangGraph multi-agent on Microsoft Foundry with RAG over security standards and CI eval gates",
+  "data_classification": "restricted",
+  "handles_pii": true,
+  "internet_facing": false,
+  "cloud_provider": "azure",
+  "third_party_vendors": ["azure-openai"],
+  "tech_stack": ["langgraph", "foundry", "python", "azure-devops"]
+}

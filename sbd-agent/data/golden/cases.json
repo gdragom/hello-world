@@ -1,0 +1,104 @@
+[
+  {
+    "id": "g1-internal-wiki",
+    "request": {
+      "project_id": "g1",
+      "title": "Internal engineering wiki",
+      "description": "Confluence replacement for internal docs, no customer data",
+      "data_classification": "internal",
+      "handles_pii": false,
+      "internet_facing": false,
+      "cloud_provider": "azure",
+      "third_party_vendors": [],
+      "tech_stack": ["azure", "sharepoint"]
+    },
+    "expected_risk": "low",
+    "expected_requirement_ids": ["AUTH-01", "LOG-01", "ENC-01"],
+    "relevant_doc_ids": ["identity_access", "logging_monitoring", "data_protection"]
+  },
+  {
+    "id": "g2-customer-portal",
+    "request": {
+      "project_id": "g2",
+      "title": "Customer self-service portal",
+      "description": "Internet facing portal collecting customer PII for support cases",
+      "data_classification": "confidential",
+      "handles_pii": true,
+      "internet_facing": true,
+      "cloud_provider": "azure",
+      "third_party_vendors": ["zendesk"],
+      "tech_stack": ["react", "api", "azure"]
+    },
+    "expected_risk": "high",
+    "expected_requirement_ids": ["AUTH-01", "PII-01", "PII-02", "NET-01", "VR-01", "SEC-01"],
+    "relevant_doc_ids": ["data_protection", "network_security", "vendor_risk", "secure_sdlc"]
+  },
+  {
+    "id": "g3-sbd-ai-agent",
+    "request": {
+      "project_id": "g3",
+      "title": "Security-by-Design AI agent",
+      "description": "LangGraph multi-agent on Microsoft Foundry with RAG over security standards",
+      "data_classification": "restricted",
+      "handles_pii": true,
+      "internet_facing": false,
+      "cloud_provider": "azure",
+      "third_party_vendors": ["azure-openai"],
+      "tech_stack": ["langgraph", "foundry", "python", "azure"]
+    },
+    "expected_risk": "critical",
+    "expected_requirement_ids": ["AI-01", "AI-02", "AI-03", "PII-01", "VR-01"],
+    "relevant_doc_ids": ["ai_llm_security", "data_protection", "vendor_risk"]
+  },
+  {
+    "id": "g4-k8s-payments",
+    "request": {
+      "project_id": "g4",
+      "title": "Payments microservice on Kubernetes",
+      "description": "Containerized payment API processing cardholder data adjacent flows",
+      "data_classification": "restricted",
+      "handles_pii": true,
+      "internet_facing": true,
+      "cloud_provider": "aws",
+      "third_party_vendors": ["stripe"],
+      "tech_stack": ["kubernetes", "golang", "aws"]
+    },
+    "expected_risk": "critical",
+    "expected_requirement_ids": ["K8S-01", "ENC-01", "PII-01", "NET-01", "VR-01"],
+    "relevant_doc_ids": ["cloud_security", "data_protection", "network_security", "vendor_risk"]
+  },
+  {
+    "id": "g5-powerbi-ops",
+    "request": {
+      "project_id": "g5",
+      "title": "Operations PowerBI dashboard",
+      "description": "Internal metrics dashboard for cyber advisory KPIs",
+      "data_classification": "confidential",
+      "handles_pii": false,
+      "internet_facing": false,
+      "cloud_provider": "azure",
+      "third_party_vendors": [],
+      "tech_stack": ["powerbi", "azure"]
+    },
+    "expected_risk": "medium",
+    "expected_requirement_ids": ["AUTH-01", "ENC-01", "LOG-01"],
+    "relevant_doc_ids": ["identity_access", "data_protection", "logging_monitoring"]
+  },
+  {
+    "id": "g6-vendor-hr",
+    "request": {
+      "project_id": "g6",
+      "title": "HR SaaS onboarding",
+      "description": "Third party HR platform storing employee personal data",
+      "data_classification": "confidential",
+      "handles_pii": true,
+      "internet_facing": true,
+      "cloud_provider": "saas",
+      "third_party_vendors": ["workday"],
+      "tech_stack": ["saas"]
+    },
+    "expected_risk": "high",
+    "expected_requirement_ids": ["VR-01", "PII-01", "AUTH-01", "NET-01"],
+    "relevant_doc_ids": ["vendor_risk", "data_protection", "identity_access", "network_security"]
+  }
+]
