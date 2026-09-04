@@ -1,118 +1,83 @@
-import { createHmac } from "crypto";
+import { BitgetRestClient, loadConfig } from "@bitget-ai/bitget-agent-sdk";
 import type { Candle, ClosedTrade } from "./types";
 
-const BITGET_BASE = process.env.BITGET_BASE_URL ?? "https://api.bitget.com";
+function firstEnv(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/** Align with official Bitget MCP env names; keep legacy aliases. */
+export function getBitgetCredentials() {
+  return {
+    apiKey: firstEnv("BITGET_API_KEY"),
+    secretKey: firstEnv("BITGET_SECRET_KEY", "BITGET_API_SECRET"),
+    passphrase: firstEnv("BITGET_PASSPHRASE", "BITGET_API_PASSPHRASE"),
+  };
+}
 
 export function hasBitgetCredentials(): boolean {
-  return Boolean(
-    process.env.BITGET_API_KEY &&
-      process.env.BITGET_API_SECRET &&
-      process.env.BITGET_API_PASSPHRASE
-  );
+  const { apiKey, secretKey, passphrase } = getBitgetCredentials();
+  return Boolean(apiKey && secretKey && passphrase);
 }
 
-function sign(
-  timestamp: string,
-  method: string,
-  requestPath: string,
-  body: string,
-  secret: string
-): string {
-  const prehash = `${timestamp}${method.toUpperCase()}${requestPath}${body}`;
-  return createHmac("sha256", secret).update(prehash).digest("base64");
-}
-
-async function bitgetFetch<T>(
-  method: "GET" | "POST",
-  pathWithQuery: string,
-  bodyObj?: Record<string, unknown>
-): Promise<T> {
-  const apiKey = process.env.BITGET_API_KEY;
-  const secret = process.env.BITGET_API_SECRET;
-  const passphrase = process.env.BITGET_API_PASSPHRASE;
-
-  if (!apiKey || !secret || !passphrase) {
-    throw new Error("Bitget API credentials are not configured");
-  }
-
-  const timestamp = Date.now().toString();
-  const body = bodyObj ? JSON.stringify(bodyObj) : "";
-  const signature = sign(timestamp, method, pathWithQuery, body, secret);
-
-  const res = await fetch(`${BITGET_BASE}${pathWithQuery}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "ACCESS-KEY": apiKey,
-      "ACCESS-SIGN": signature,
-      "ACCESS-TIMESTAMP": timestamp,
-      "ACCESS-PASSPHRASE": passphrase,
-      locale: "en-US",
-    },
-    body: method === "GET" ? undefined : body,
-    cache: "no-store",
+function createClient(): BitgetRestClient {
+  const { apiKey, secretKey, passphrase } = getBitgetCredentials();
+  const config = loadConfig({
+    modules: "account,trade,market",
+    readOnly: true,
+    apiKey,
+    secretKey,
+    passphrase,
   });
-
-  const json = (await res.json()) as {
-    code: string;
-    msg: string;
-    data: T;
-  };
-
-  if (!res.ok || json.code !== "00000") {
-    throw new Error(json.msg || `Bitget error (${res.status})`);
-  }
-
-  return json.data;
+  return new BitgetRestClient(config);
 }
 
-type BitgetHistoryPosition = {
-  positionId?: string;
-  symbol: string;
-  holdSide: string;
-  marginMode?: string;
-  openAvgPrice?: string;
-  closeAvgPrice?: string;
-  openPriceAvg?: string;
-  closePriceAvg?: string;
-  ctime?: string;
-  utime?: string;
-  openTime?: string;
-  closeTime?: string;
-  achivedProfit?: string;
-  realizedPnl?: string;
-  pnl?: string;
-  openFee?: string;
-  closeFee?: string;
-  totalFee?: string;
-  openTotalPos?: string;
-  closeTotalPos?: string;
-  size?: string;
-};
+type HistoryRow = Record<string, unknown>;
 
-function num(v: string | undefined, fallback = 0): number {
+function num(v: unknown, fallback = 0): number {
   if (v === undefined || v === null || v === "") return fallback;
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function mapHistoryPosition(row: BitgetHistoryPosition): ClosedTrade {
-  const side = row.holdSide?.toLowerCase().includes("short") ? "short" : "long";
-  const entry = num(row.openAvgPrice ?? row.openPriceAvg);
-  const exit = num(row.closeAvgPrice ?? row.closePriceAvg);
-  const size = num(row.closeTotalPos ?? row.openTotalPos ?? row.size);
-  const pnl = num(row.achivedProfit ?? row.realizedPnl ?? row.pnl);
-  const openTime = num(row.ctime ?? row.openTime, Date.now());
-  const closeTime = num(row.utime ?? row.closeTime, openTime);
+function str(v: unknown): string {
+  return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+function mapHistoryPosition(row: HistoryRow): ClosedTrade {
+  const holdSide = str(row.holdSide || row.posSide || row.side).toLowerCase();
+  const side =
+    holdSide.includes("short") || holdSide.includes("sell") ? "short" : "long";
+  const entry = num(row.openAvgPrice ?? row.openPriceAvg ?? row.avgOpenPrice);
+  const exit = num(row.closeAvgPrice ?? row.closePriceAvg ?? row.avgClosePrice);
+  const size = num(
+    row.closeTotalPos ?? row.openTotalPos ?? row.size ?? row.qty ?? row.closedSize
+  );
+  const pnl = num(
+    row.achivedProfit ??
+      row.achievedProfit ??
+      row.realizedPnl ??
+      row.pnl ??
+      row.netProfit
+  );
+  const openTime = num(row.ctime ?? row.openTime ?? row.createdTime, Date.now());
+  const closeTime = num(
+    row.utime ?? row.closeTime ?? row.updatedTime,
+    openTime
+  );
+  const symbol = str(row.symbol || "BTCUSDT").replace(/_UMCBL$/i, "");
   const id =
-    row.positionId ||
-    `${row.symbol}-${side}-${openTime}-${closeTime}-${entry}-${exit}`;
+    str(row.positionId || row.posId) ||
+    `${symbol}-${side}-${openTime}-${closeTime}-${entry}-${exit}`;
 
   return {
     id,
-    symbol: row.symbol?.replace("_UMCBL", "") || "BTCUSDT",
+    symbol,
     side,
-    marginMode: row.marginMode || "crossed",
+    marginMode: str(row.marginMode || row.marginModeType || "crossed"),
     openTime,
     closeTime,
     entryPrice: entry,
@@ -121,32 +86,59 @@ function mapHistoryPosition(row: BitgetHistoryPosition): ClosedTrade {
     pnl,
     openFee: num(row.openFee),
     closeFee: num(row.closeFee),
+    fundingFee: num(row.fundingFee ?? row.totalFunding),
     source: "bitget",
   };
+}
+
+function unwrapList(data: unknown): HistoryRow[] {
+  if (Array.isArray(data)) return data as HistoryRow[];
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.list)) return obj.list as HistoryRow[];
+    if (Array.isArray(obj.data)) return obj.data as HistoryRow[];
+  }
+  return [];
+}
+
+function normalizeInterval(granularity: string): string {
+  const map: Record<string, string> = {
+    "1m": "1m",
+    "3m": "3m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1h": "1H",
+    "1H": "1H",
+    "4h": "4H",
+    "4H": "4H",
+    "1d": "1D",
+    "1D": "1D",
+  };
+  return map[granularity] ?? "15m";
 }
 
 export async function fetchBitgetClosedPositions(options?: {
   symbol?: string;
   limit?: number;
 }): Promise<ClosedTrade[]> {
-  const symbol = options?.symbol ?? "BTCUSDT";
-  const limit = options?.limit ?? 50;
-  const qs = new URLSearchParams({
-    productType: "USDT-FUTURES",
-    symbol,
-    limit: String(limit),
+  if (!hasBitgetCredentials()) {
+    throw new Error(
+      "Bitget credentials missing. Set BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE (same as Bitget MCP)."
+    );
+  }
+
+  const client = createClient();
+  const result = await client.callOperation<unknown>("getPositionsHistory", {
+    category: "USDT-FUTURES",
+    symbol: options?.symbol ?? "BTCUSDT",
+    limit: String(options?.limit ?? 50),
   });
 
-  const data = await bitgetFetch<BitgetHistoryPosition[] | { list?: BitgetHistoryPosition[] }>(
-    "GET",
-    `/api/v2/mix/position/history-position?${qs.toString()}`
-  );
-
-  const rows = Array.isArray(data) ? data : data.list ?? [];
-  return rows.map(mapHistoryPosition).sort((a, b) => b.closeTime - a.closeTime);
+  return unwrapList(result.data)
+    .map(mapHistoryPosition)
+    .sort((a, b) => b.closeTime - a.closeTime);
 }
-
-type BitgetCandle = string[];
 
 export async function fetchBitgetCandles(options: {
   symbol?: string;
@@ -155,39 +147,59 @@ export async function fetchBitgetCandles(options: {
   endTime?: number;
   limit?: number;
 }): Promise<Candle[]> {
-  const symbol = options.symbol ?? "BTCUSDT";
-  const granularity = options.granularity ?? "15m";
-  const limit = options.limit ?? 300;
-  const qs = new URLSearchParams({
-    symbol,
-    productType: "USDT-FUTURES",
-    granularity,
-    limit: String(limit),
-  });
-  if (options.startTime) qs.set("startTime", String(options.startTime));
-  if (options.endTime) qs.set("endTime", String(options.endTime));
-
-  // Public market endpoint — still works without auth, but use same fetch helper path via unsigned GET
-  const url = `${BITGET_BASE}/api/v2/mix/market/candles?${qs.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
-  const json = (await res.json()) as {
-    code: string;
-    msg: string;
-    data: BitgetCandle[];
+  const client = createClient();
+  const args: Record<string, unknown> = {
+    category: "USDT-FUTURES",
+    symbol: options.symbol ?? "BTCUSDT",
+    interval: normalizeInterval(options.granularity ?? "15m"),
+    limit: String(options.limit ?? 300),
   };
-  if (!res.ok || json.code !== "00000") {
-    throw new Error(json.msg || "Failed to fetch candles");
+  if (options.startTime) args.startTime = String(options.startTime);
+  if (options.endTime) args.endTime = String(options.endTime);
+
+  const preferHistory = Boolean(options.startTime || options.endTime);
+  let data: unknown;
+  try {
+    const result = await client.callOperation<unknown>(
+      preferHistory ? "getKlineCandlestickHistory" : "getKlineCandlestick",
+      args
+    );
+    data = result.data;
+  } catch (error) {
+    if (!preferHistory) throw error;
+    const result = await client.callOperation<unknown>(
+      "getKlineCandlestick",
+      args
+    );
+    data = result.data;
   }
 
-  // Bitget returns [ts, open, high, low, close, volume, quoteVolume] newest first often
-  const candles = (json.data || []).map((row) => ({
-    time: Math.floor(Number(row[0]) / 1000),
-    open: Number(row[1]),
-    high: Number(row[2]),
-    low: Number(row[3]),
-    close: Number(row[4]),
-    volume: Number(row[5] ?? 0),
-  }));
+  const rows = unwrapList(data);
+  const candles = rows.map((row) => {
+    if (Array.isArray(row)) {
+      const arr = row as unknown[];
+      return {
+        time: Math.floor(num(arr[0]) / 1000),
+        open: num(arr[1]),
+        high: num(arr[2]),
+        low: num(arr[3]),
+        close: num(arr[4]),
+        volume: num(arr[5]),
+      };
+    }
+    const obj = row as HistoryRow;
+    const ts = num(obj.ts ?? obj.timestamp ?? obj.time);
+    return {
+      time: Math.floor((ts > 1e12 ? ts : ts * 1000) / 1000),
+      open: num(obj.open),
+      high: num(obj.high),
+      low: num(obj.low),
+      close: num(obj.close),
+      volume: num(obj.volume ?? obj.baseVolume),
+    };
+  });
 
-  return candles.sort((a, b) => a.time - b.time);
+  return candles
+    .filter((c) => c.time > 0)
+    .sort((a, b) => a.time - b.time);
 }

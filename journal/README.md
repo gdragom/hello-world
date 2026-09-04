@@ -20,10 +20,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Key | Purpose |
 |-----|---------|
-| `BITGET_API_KEY` / `SECRET` / `PASSPHRASE` | Bitget API |
+| `BITGET_API_KEY` / `BITGET_SECRET_KEY` / `BITGET_PASSPHRASE` | Same as official Bitget MCP |
 | `DEFAULT_RISK_USD` | 1R 달러 (기본 25) |
 | `OPENAI_API_KEY` | 선택. 있으면 AI 복기 문구 강화 |
 | `JOURNAL_FORCE_DEMO` | `1`이면 항상 데모 |
+
+Legacy aliases `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` still work.
+
+## Bitget MCP (Cursor)
+
+See [`../docs/BITGET-MCP.md`](../docs/BITGET-MCP.md). LEDGER sync uses `@bitget-ai/bitget-agent-sdk` (UTA v3), the same stack as `@bitget-ai/bitget-agent-mcp`.
 
 ## Workflow
 
@@ -37,6 +43,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Notes
 
-- Bitget MCP는 이 환경에 없어서 REST API로 연동했습니다. MCP를 주시면 같은 화면 뒤에 어댑터만 바꾸면 됩니다.
-- API 키는 **읽기 전용** 권한만 주세요.
-- 차트 캔들은 공개 엔드포인트, 포지션 히스토리는 서명 엔드포인트를 사용합니다.
+- Official Bitget MCP for Cursor: `@bitget-ai/bitget-agent-mcp` (see `docs/BITGET-MCP.md`).
+- LEDGER uses `@bitget-ai/bitget-agent-sdk` for Sync Bitget (UTA v3 history + candles).
+- API keys: prefer **read-only** permissions for journaling.
+- Chart candles are public; position history is signed.
