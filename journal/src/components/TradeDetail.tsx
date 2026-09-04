@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { compressImage } from "@/lib/image";
 import { RULE_LABELS } from "@/lib/rules";
 import type {
   ClosedTrade,
@@ -8,11 +9,16 @@ import type {
   ReviewResult,
   RuleChecklistState,
 } from "@/lib/types";
-import { DEFAULT_CHECKLIST } from "@/lib/rules";
+import {
+  DEFAULT_CHECKLIST,
+  estimateR,
+  normalizeChecklist,
+  stopLossUsd,
+  stopRange,
+} from "@/lib/rules";
 
 type Props = {
   trade: ClosedTrade;
-  riskDollars: number;
 };
 
 const verdictLabel: Record<ReviewResult["verdict"], string> = {
@@ -22,19 +28,25 @@ const verdictLabel: Record<ReviewResult["verdict"], string> = {
   unclear: "판단 보류",
 };
 
-export function TradeDetail({ trade, riskDollars }: Props) {
+export function TradeDetail({ trade }: Props) {
+  const risk = stopLossUsd(trade);
+  const range = stopRange(trade);
+  const rMultiple = estimateR(trade);
   const [journal, setJournal] = useState<JournalEntry>({
     tradeId: trade.id,
     entryReason: "",
     exitReason: "",
     checklist: { ...DEFAULT_CHECKLIST },
     tags: [],
+    screenshots: [],
     updatedAt: 0,
   });
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [status, setStatus] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +58,22 @@ export function TradeDetail({ trade, riskDollars }: Props) {
       const jJson = await jRes.json();
       const rJson = await rRes.json();
       if (cancelled) return;
-      setJournal(jJson.journal);
+      const remote = jJson.journal as JournalEntry;
+      let next = remote;
+      try {
+        const raw = localStorage.getItem(`ledger-journal:${trade.id}`);
+        if (raw) {
+          const local = JSON.parse(raw) as JournalEntry;
+          if ((local.updatedAt ?? 0) >= (remote.updatedAt ?? 0)) next = local;
+        }
+      } catch {
+        /* ignore */
+      }
+      setJournal({
+        ...next,
+        checklist: normalizeChecklist(next.checklist),
+        screenshots: next.screenshots ?? [],
+      });
       setReview(rJson.review);
       setStatus("");
     })();
@@ -65,6 +92,31 @@ export function TradeDetail({ trade, riskDollars }: Props) {
     [journal.checklist]
   );
 
+  async function addFiles(files: FileList | File[]) {
+    const list = [...files].filter((f) => f.type.startsWith("image/"));
+    if (!list.length) return;
+    setStatus("차트 첨부 중…");
+    try {
+      const added = [];
+      for (const file of list.slice(0, 4)) {
+        const dataUrl = await compressImage(file);
+        added.push({
+          id: `${Date.now()}-${file.name}`,
+          name: file.name,
+          dataUrl,
+          createdAt: Date.now(),
+        });
+      }
+      setJournal((j) => ({
+        ...j,
+        screenshots: [...(j.screenshots ?? []), ...added].slice(0, 6),
+      }));
+      setStatus("차트 첨부됨 · 저장을 누르세요");
+    } catch {
+      setStatus("첨부 실패");
+    }
+  }
+
   async function saveJournal() {
     setSaving(true);
     setStatus("저장 중…");
@@ -76,6 +128,14 @@ export function TradeDetail({ trade, riskDollars }: Props) {
       });
       const json = await res.json();
       setJournal(json.journal);
+      try {
+        localStorage.setItem(
+          `ledger-journal:${trade.id}`,
+          JSON.stringify(json.journal)
+        );
+      } catch {
+        /* ignore */
+      }
       setStatus("저장됨");
     } catch {
       setStatus("저장 실패");
@@ -95,8 +155,8 @@ export function TradeDetail({ trade, riskDollars }: Props) {
         body: JSON.stringify({
           tradeId: trade.id,
           trade,
-          riskDollars,
           useAi,
+          journal,
         }),
       });
       const json = await res.json();
@@ -139,8 +199,16 @@ export function TradeDetail({ trade, riskDollars }: Props) {
           <strong>{trade.size} BTC</strong>
         </div>
         <div>
-          <span>Risk 1R</span>
-          <strong>${riskDollars}</strong>
+          <span>손절 범위</span>
+          <strong>{range.toFixed(1)}</strong>
+        </div>
+        <div>
+          <span>1R (SL)</span>
+          <strong>{risk !== null ? `$${risk.toFixed(2)}` : "—"}</strong>
+        </div>
+        <div>
+          <span>실현 R</span>
+          <strong>{rMultiple !== null ? `${rMultiple.toFixed(2)}R` : "—"}</strong>
         </div>
       </div>
 
@@ -167,6 +235,80 @@ export function TradeDetail({ trade, riskDollars }: Props) {
           rows={3}
         />
       </label>
+
+      <div className="attach-block">
+        <div className="attach-row">
+          <p className="section-title">TradingView 차트</p>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => fileRef.current?.click()}
+          >
+            첨부
+          </button>
+        </div>
+        <p className="attach-hint">
+          스크린샷을 고르거나, 이 칸에 붙여넣기(Ctrl+V) 하세요.
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files) void addFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <div
+          className="attach-drop"
+          tabIndex={0}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.files];
+            if (files.length) {
+              e.preventDefault();
+              void addFiles(files);
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            void addFiles(e.dataTransfer.files);
+          }}
+        >
+          {(journal.screenshots ?? []).length ? (
+            <div className="shot-grid">
+              {journal.screenshots.map((shot) => (
+                <figure key={shot.id} className="shot-card">
+                  <button
+                    type="button"
+                    className="shot-open"
+                    onClick={() => setPreview(shot.dataUrl)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={shot.dataUrl} alt={shot.name} />
+                  </button>
+                  <button
+                    type="button"
+                    className="shot-remove"
+                    onClick={() =>
+                      setJournal((j) => ({
+                        ...j,
+                        screenshots: j.screenshots.filter((s) => s.id !== shot.id),
+                      }))
+                    }
+                  >
+                    삭제
+                  </button>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <span>아직 첨부한 차트가 없습니다.</span>
+          )}
+        </div>
+      </div>
 
       <div className="checklist">
         <p className="section-title">규칙 체크리스트</p>
@@ -257,6 +399,17 @@ export function TradeDetail({ trade, riskDollars }: Props) {
             </div>
           ) : null}
         </section>
+      ) : null}
+
+      {preview ? (
+        <button
+          type="button"
+          className="lightbox"
+          onClick={() => setPreview(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="TradingView 차트" />
+        </button>
       ) : null}
     </div>
   );

@@ -17,6 +17,18 @@ export const metadata: Metadata = {
   title: "LEDGER · BTC ICT Journal",
   description:
     "Bitget-connected trading journal with entry/exit charts and process review.",
+  appleWebApp: {
+    capable: true,
+    title: "LEDGER",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
+  themeColor: "#0c0b0a",
 };
 
 export default function RootLayout({

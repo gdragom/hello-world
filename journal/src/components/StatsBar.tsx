@@ -35,8 +35,8 @@ export function StatsBar({ stats, source, riskDollars }: Props) {
         </strong>
       </div>
       <div>
-        <span className="label">1R</span>
-        <strong>${riskDollars}</strong>
+        <span className="label">Avg 1R</span>
+        <strong>${riskDollars.toFixed(2)}</strong>
       </div>
       <div>
         <span className="label">Source</span>

@@ -15,21 +15,19 @@ function fmtTime(ms: number) {
 type Props = {
   trades: ClosedTrade[];
   selectedId: string | null;
-  riskDollars: number;
   onSelect: (trade: ClosedTrade) => void;
 };
 
 export function TradeList({
   trades,
   selectedId,
-  riskDollars,
   onSelect,
 }: Props) {
   return (
     <div className="trade-list">
       {trades.map((trade) => {
         const outcome = outcomeOf(trade);
-        const r = estimateR(trade, riskDollars);
+        const r = estimateR(trade);
         return (
           <button
             key={trade.id}

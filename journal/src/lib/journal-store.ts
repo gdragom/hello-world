@@ -1,9 +1,11 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { DEFAULT_CHECKLIST } from "./rules";
+import { DEFAULT_CHECKLIST, normalizeChecklist } from "./rules";
 import type { JournalEntry, ReviewResult } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = process.env.VERCEL
+  ? path.join("/tmp", "ledger-data")
+  : path.join(process.cwd(), "data");
 const JOURNAL_FILE = path.join(DATA_DIR, "journal.json");
 const REVIEW_FILE = path.join(DATA_DIR, "reviews.json");
 
@@ -30,16 +32,23 @@ async function writeJson(file: string, value: unknown) {
 
 export async function getJournal(tradeId: string): Promise<JournalEntry> {
   const all = await readJson<JournalMap>(JOURNAL_FILE, {});
-  return (
-    all[tradeId] ?? {
+  const stored = all[tradeId];
+  if (!stored) {
+    return {
       tradeId,
       entryReason: "",
       exitReason: "",
       checklist: { ...DEFAULT_CHECKLIST },
       tags: [],
+      screenshots: [],
       updatedAt: 0,
-    }
-  );
+    };
+  }
+  return {
+    ...stored,
+    checklist: normalizeChecklist(stored.checklist),
+    screenshots: stored.screenshots ?? [],
+  };
 }
 
 export async function upsertJournal(
@@ -52,16 +61,17 @@ export async function upsertJournal(
     exitReason: "",
     checklist: { ...DEFAULT_CHECKLIST },
     tags: [],
+    screenshots: [],
     updatedAt: 0,
   };
 
   const next: JournalEntry = {
     ...prev,
     ...partial,
-    checklist: {
+    checklist: normalizeChecklist({
       ...prev.checklist,
       ...(partial.checklist ?? {}),
-    },
+    }),
     updatedAt: Date.now(),
   };
 

@@ -28,23 +28,36 @@ export interface Candle {
   volume: number;
 }
 
+export interface JournalScreenshot {
+  id: string;
+  name: string;
+  dataUrl: string;
+  createdAt: number;
+}
+
 export interface JournalEntry {
   tradeId: string;
   entryReason: string;
   exitReason: string;
   checklist: RuleChecklistState;
   tags: string[];
+  screenshots: JournalScreenshot[];
   updatedAt: number;
 }
 
 export interface RuleChecklistState {
+  dailyBias: boolean;
   mssConfirmed: boolean;
   fibDiscountOk: boolean;
   cisdConfirmed: boolean;
   sessionOk: boolean;
-  riskOneRDefined: boolean;
-  targetAtLeast2R: boolean;
   noEarlyPartialBefore2R: boolean;
+}
+
+export interface PeriodNote {
+  id: string;
+  note: string;
+  updatedAt: number;
 }
 
 export interface ReviewResult {

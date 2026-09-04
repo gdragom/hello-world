@@ -130,6 +130,32 @@ export const DEMO_TRADES: ClosedTrade[] = [
     closeFee: 1.03,
     source: "demo",
   },
+  {
+    id: "demo-9",
+    symbol: "BTCUSDT",
+    side: "long",
+    marginMode: "crossed",
+    openTime: Date.parse("2026-07-18T09:10:00Z"),
+    closeTime: Date.parse("2026-07-18T15:40:00Z"),
+    entryPrice: 68240,
+    exitPrice: 69110,
+    size: 0.03,
+    pnl: 26.1,
+    source: "demo",
+  },
+  {
+    id: "demo-10",
+    symbol: "BTCUSDT",
+    side: "short",
+    marginMode: "crossed",
+    openTime: Date.parse("2026-07-09T11:00:00Z"),
+    closeTime: Date.parse("2026-07-09T16:20:00Z"),
+    entryPrice: 67880,
+    exitPrice: 68420,
+    size: 0.03,
+    pnl: -16.2,
+    source: "demo",
+  },
 ];
 
 function seededNoise(seed: number): number {

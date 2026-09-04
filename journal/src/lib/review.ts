@@ -12,13 +12,14 @@ import type {
 } from "./types";
 
 function brokenRules(checklist: RuleChecklistState): string[] {
-  return (Object.keys(checklist) as (keyof RuleChecklistState)[])
+  return (Object.keys(RULE_LABELS) as (keyof RuleChecklistState)[])
     .filter((k) => !checklist[k])
+    .filter((k) => RULE_LABELS[k])
     .map((k) => RULE_LABELS[k]);
 }
 
 function keptRules(checklist: RuleChecklistState): string[] {
-  return (Object.keys(checklist) as (keyof RuleChecklistState)[])
+  return (Object.keys(RULE_LABELS) as (keyof RuleChecklistState)[])
     .filter((k) => checklist[k])
     .map((k) => RULE_LABELS[k]);
 }
@@ -26,11 +27,11 @@ function keptRules(checklist: RuleChecklistState): string[] {
 function rulesBasedReview(
   trade: ClosedTrade,
   journal: JournalEntry,
-  riskDollars: number
+  _riskDollars: number
 ): ReviewResult {
   const kept = keptRules(journal.checklist);
   const broken = brokenRules(journal.checklist);
-  const r = estimateR(trade, riskDollars);
+  const r = estimateR(trade);
   const outcome = outcomeOf(trade);
   const processScore = kept.length / Object.keys(journal.checklist).length;
 
@@ -62,7 +63,7 @@ function rulesBasedReview(
     summary =
       "결과와 별개로 핵심 규칙을 충분히 지키지 못했습니다. 복기의 초점은 PnL이 아니라 위반 항목입니다.";
     marketNote =
-      "시장 탓으로 넘기기 전에, 진입 필터(2R 경로/세션/CISD)부터 다시 점검하세요.";
+      "시장 탓으로 넘기기 전에, Daily Bias·세션·CISD부터 다시 점검하세요.";
   } else {
     verdict = "mixed";
     summary =
@@ -70,13 +71,13 @@ function rulesBasedReview(
     marketNote = "애매한 셋업은 스킵 비율을 높이는 쪽이 챌린지 계좌에 유리합니다.";
   }
 
+  if (!journal.checklist.dailyBias) {
+    suggestions.push("진입 전 Daily Bias를 한 줄로 적고, Bias와 반대 셋업은 스킵하세요.");
+  }
   if (!journal.checklist.noEarlyPartialBefore2R) {
     suggestions.push(
       "2R 전 반익절을 했다면, 다음부터는 TP1을 손절 거리 ×2에만 두세요."
     );
-  }
-  if (!journal.checklist.targetAtLeast2R) {
-    suggestions.push("진입 전 ‘2R까지 길이’가 없으면 패스 규칙을 강제하세요.");
   }
   if (!journal.checklist.sessionOk) {
     suggestions.push("아시아 세션 체결이 섞였는지 시간을 확인하세요.");

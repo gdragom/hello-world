@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { DEMO_TRADES } from "@/lib/demo-data";
 import { fetchBitgetClosedPositions, hasBitgetCredentials } from "@/lib/bitget";
-import { getJournal, getReview, saveReview } from "@/lib/journal-store";
+import { getJournal, getReview, saveReview, upsertJournal } from "@/lib/journal-store";
 import { buildReview } from "@/lib/review";
-import type { ClosedTrade } from "@/lib/types";
+import type { ClosedTrade, JournalEntry } from "@/lib/types";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,15 @@ const bodySchema = z.object({
     .optional(),
   riskDollars: z.number().positive().optional(),
   useAi: z.boolean().optional(),
+  journal: z
+    .object({
+      tradeId: z.string(),
+      entryReason: z.string().optional(),
+      exitReason: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+      checklist: z.record(z.string(), z.boolean()).optional(),
+    })
+    .optional(),
 });
 
 async function resolveTrade(
@@ -69,6 +78,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Trade not found" }, { status: 404 });
   }
 
+  if (parsed.data.journal) {
+    await upsertJournal({
+      tradeId: trade.id,
+      entryReason: parsed.data.journal.entryReason,
+      exitReason: parsed.data.journal.exitReason,
+      tags: parsed.data.journal.tags,
+      checklist: parsed.data.journal.checklist as unknown as
+        | JournalEntry["checklist"]
+        | undefined,
+    });
+  }
   const journal = await getJournal(trade.id);
   const review = await buildReview({
     trade,
