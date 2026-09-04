@@ -87,7 +87,8 @@ export function Dashboard() {
           <h1>BTC ICT Journal</h1>
           <p className="lede">
             Bitget 체결을 불러오고, 진입·청산을 차트에 표시한 뒤, 규칙 준수
-            여부를 AI/룰엔진과 함께 복기합니다.
+            여부를 AI/룰엔진과 함께 복기합니다. Cursor에서는 공식 Bitget MCP도
+            같이 쓸 수 있습니다.
           </p>
         </div>
         <div className="hero-actions">
