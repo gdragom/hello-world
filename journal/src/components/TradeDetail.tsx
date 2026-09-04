@@ -6,6 +6,7 @@ import { RULE_LABELS } from "@/lib/rules";
 import type {
   ClosedTrade,
   JournalEntry,
+  JournalScreenshot,
   ReviewResult,
   RuleChecklistState,
 } from "@/lib/types";
@@ -97,7 +98,7 @@ export function TradeDetail({ trade }: Props) {
     if (!list.length) return;
     setStatus("차트 첨부 중…");
     try {
-      const added = [];
+      const added: JournalScreenshot[] = [];
       for (const file of list.slice(0, 4)) {
         const dataUrl = await compressImage(file);
         added.push({
