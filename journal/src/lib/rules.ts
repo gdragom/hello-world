@@ -2,6 +2,7 @@ import type { ClosedTrade, RuleChecklistState, TradeStats } from "./types";
 
 export const DEFAULT_CHECKLIST: RuleChecklistState = {
   dailyBias: false,
+  hourlyCandleStructuralSweep: false,
   mssConfirmed: false,
   fibDiscountOk: false,
   cisdConfirmed: false,
@@ -11,6 +12,7 @@ export const DEFAULT_CHECKLIST: RuleChecklistState = {
 
 export const RULE_LABELS: Record<keyof RuleChecklistState, string> = {
   dailyBias: "Daily Bias 확인",
+  hourlyCandleStructuralSweep: "1H candle / structural sweep",
   mssConfirmed: "1H+ MSS 확인",
   fibDiscountOk: "Fib 0.5 discount/premium",
   cisdConfirmed: "5~15m CISD 확인",
@@ -34,12 +36,13 @@ export function normalizeChecklist(
 export const STRATEGY_BRIEF = `
 ICT BTC 전략 규칙:
 1) Daily Bias 확인 후에만 거래.
-2) 아시아 세션 거래 금지. 유럽/뉴욕만.
-3) 1H 이상에서 MSS 확인 후에만 방향 신뢰.
-4) Fib 0.5 기준 discount(롱)/premium(숏)에서만 관심.
-5) 5m/10m/15m CISD로 타이밍 진입.
-6) 반익절은 2R에서만 50%. 그 전 조기 반익절 금지.
-7) 나머지 포지션은 BE 보호 후 3R 또는 구조 청산.
+2) 1H candle / structural sweep 확인 후에만 진행.
+3) 아시아 세션 거래 금지. 유럽/뉴욕만.
+4) 1H 이상에서 MSS 확인 후에만 방향 신뢰.
+5) Fib 0.5 기준 discount(롱)/premium(숏)에서만 관심.
+6) 5m/10m/15m CISD로 타이밍 진입.
+7) 반익절은 2R에서만 50%. 그 전 조기 반익절 금지.
+8) 나머지 포지션은 BE 보호 후 3R 또는 구조 청산.
 `.trim();
 
 export function outcomeOf(trade: ClosedTrade): "win" | "loss" | "breakeven" {

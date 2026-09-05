@@ -23,6 +23,7 @@ const bodySchema = z.object({
   checklist: z
     .object({
       dailyBias: z.boolean().optional(),
+      hourlyCandleStructuralSweep: z.boolean().optional(),
       mssConfirmed: z.boolean().optional(),
       fibDiscountOk: z.boolean().optional(),
       cisdConfirmed: z.boolean().optional(),

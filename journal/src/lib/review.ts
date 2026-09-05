@@ -74,6 +74,11 @@ function rulesBasedReview(
   if (!journal.checklist.dailyBias) {
     suggestions.push("진입 전 Daily Bias를 한 줄로 적고, Bias와 반대 셋업은 스킵하세요.");
   }
+  if (!journal.checklist.hourlyCandleStructuralSweep) {
+    suggestions.push(
+      "Daily Bias 다음으로 1H candle / structural sweep을 확인하고, sweep 없는 구간은 스킵하세요."
+    );
+  }
   if (!journal.checklist.noEarlyPartialBefore2R) {
     suggestions.push(
       "2R 전 반익절을 했다면, 다음부터는 TP1을 손절 거리 ×2에만 두세요."

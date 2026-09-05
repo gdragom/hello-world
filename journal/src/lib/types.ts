@@ -47,6 +47,7 @@ export interface JournalEntry {
 
 export interface RuleChecklistState {
   dailyBias: boolean;
+  hourlyCandleStructuralSweep: boolean;
   mssConfirmed: boolean;
   fibDiscountOk: boolean;
   cisdConfirmed: boolean;
