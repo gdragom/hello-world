@@ -191,6 +191,68 @@ button.secondary {
   font-size: 14px;
 }
 
+.alert-feed {
+  background: rgba(22, 20, 17, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.alert-row {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #120f0c;
+}
+
+.alert-row.stage-SETUP_ARMED {
+  border-color: rgba(232, 168, 56, 0.35);
+}
+
+.alert-row.stage-ENTRY_READY {
+  border-color: rgba(61, 186, 126, 0.4);
+}
+
+.alert-row.stage-INVALID {
+  border-color: rgba(212, 84, 60, 0.35);
+}
+
+.alert-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.alert-stage {
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.alert-row strong {
+  font-size: 13px;
+}
+
+.alert-row p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .month-filters {
   display: flex;
   flex-wrap: wrap;

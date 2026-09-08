@@ -5,6 +5,7 @@ import { StatsBar } from "@/components/StatsBar";
 import { TradeChart } from "@/components/TradeChart";
 import { TradeDetail } from "@/components/TradeDetail";
 import { TradeList } from "@/components/TradeList";
+import { AlertFeed } from "@/components/AlertFeed";
 import { MonthlyTrendChart } from "@/components/MonthlyTrendChart";
 import { PnLCalendar } from "@/components/PnLCalendar";
 import { averageStopRisk, computeStats } from "@/lib/rules";
@@ -116,7 +117,7 @@ export function Dashboard() {
           <p className="brand">LEDGER</p>
           <h1>BTC ICT Journal</h1>
           <p className="lede">
-            Bitget 체결을 차트에 올리고 ICT 규칙으로 복기합니다.
+          Bitget 체결 복기 + TradingView 셋업 알림.
           </p>
         </div>
         <div className="hero-actions">
@@ -136,6 +137,8 @@ export function Dashboard() {
       {message ? <p className="banner">{message}</p> : null}
 
       <StatsBar stats={stats} source={source} riskDollars={avgRisk} />
+
+      <AlertFeed />
 
       <div className="month-filters">
         {monthOptions.map((key) => (

@@ -15,7 +15,8 @@ const bodySchema = z.object({
       z.object({
         id: z.string(),
         name: z.string(),
-        dataUrl: z.string(),
+        url: z.string().optional(),
+        dataUrl: z.string().optional(),
         createdAt: z.number(),
       })
     )

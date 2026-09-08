@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname === "/login" ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/tv-webhook") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {

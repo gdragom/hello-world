@@ -21,9 +21,13 @@ Open [http://localhost:3000](http://localhost:3000).
 | Key | Purpose |
 |-----|---------|
 | `BITGET_API_KEY` / `BITGET_SECRET_KEY` / `BITGET_PASSPHRASE` | Same as official Bitget MCP |
-| `DEFAULT_RISK_USD` | 1R 달러 (기본 25) |
-| `OPENAI_API_KEY` | 선택. 있으면 AI 복기 문구 강화 |
+| `DEFAULT_RISK_USD` | legacy / fallback |
+| `OPENAI_API_KEY` | 선택. AI 복기 |
 | `JOURNAL_FORCE_DEMO` | `1`이면 항상 데모 |
+| `SITE_PASSWORD` | Vercel 접속 잠금 |
+| `TV_WEBHOOK_SECRET` | TradingView webhook 인증 |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 셋업 푸시 |
+| `R2_*` | 스크린샷 영구 저장 (see R2 doc) |
 
 Legacy aliases `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` still work.
 
@@ -39,11 +43,19 @@ See [`../docs/BITGET-MCP.md`](../docs/BITGET-MCP.md). LEDGER sync uses `@bitget-
 4. **규칙 복기** → 프로세스 승·패 구분 (결과와 분리)
 5. (선택) **AI 복기** → OpenAI로 코칭 문장 보강
 
-저널/복기 데이터는 로컬에서 `journal/data/*.json`에 저장됩니다. Vercel에서는 기기 `localStorage` + 서버 `/tmp`를 씁니다.
+저널/복기 데이터는 로컬에서 `journal/data/*.json`에 저장됩니다. Vercel `/tmp`는 임시입니다. 스크린샷은 [Cloudflare R2](../docs/R2-STORAGE.md)를 권장합니다.
+
+## TradingView alerts
+
+장중 알림은 Bitget이 아니라 **TradingView webhook** → `/api/tv-webhook` → 대시보드 + (선택) Telegram.
+
+See [`../docs/TV-WEBHOOK.md`](../docs/TV-WEBHOOK.md).
+
+Stages: `SETUP_ARMED` (1H) → `ENTRY_READY` (5m) → optional `INVALID`.
 
 ## Vercel
 
-`journal/`을 루트로 배포하고 환경 변수에 Bitget 키와 `SITE_PASSWORD`를 넣습니다. 공개 URL은 비밀번호 없이 열리지 않습니다.
+`journal/`을 루트로 배포하고 환경 변수에 Bitget 키, `SITE_PASSWORD`, (선택) `TV_WEBHOOK_SECRET` / Telegram / R2를 넣습니다.
 
 ### CI/CD (GitHub Actions)
 

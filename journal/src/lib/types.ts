@@ -31,7 +31,9 @@ export interface Candle {
 export interface JournalScreenshot {
   id: string;
   name: string;
-  dataUrl: string;
+  /** Remote URL (R2) preferred; dataUrl kept for local/demo fallback */
+  url?: string;
+  dataUrl?: string;
   createdAt: number;
 }
 
@@ -59,6 +61,22 @@ export interface PeriodNote {
   id: string;
   note: string;
   updatedAt: number;
+}
+
+export type AlertStage = "SETUP_ARMED" | "ENTRY_READY" | "INVALID";
+
+export type AlertSide = "long" | "short" | "unknown";
+
+export interface SetupAlert {
+  id: string;
+  stage: AlertStage;
+  symbol: string;
+  side: AlertSide;
+  timeframe: string;
+  price: number | null;
+  message: string;
+  source: "tradingview";
+  createdAt: number;
 }
 
 export interface ReviewResult {

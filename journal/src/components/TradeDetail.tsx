@@ -96,17 +96,24 @@ export function TradeDetail({ trade }: Props) {
   async function addFiles(files: FileList | File[]) {
     const list = [...files].filter((f) => f.type.startsWith("image/"));
     if (!list.length) return;
-    setStatus("차트 첨부 중…");
+    setStatus("차트 업로드 중…");
     try {
       const added: JournalScreenshot[] = [];
       for (const file of list.slice(0, 4)) {
-        const dataUrl = await compressImage(file);
-        added.push({
-          id: `${Date.now()}-${file.name}`,
-          name: file.name,
-          dataUrl,
-          createdAt: Date.now(),
-        });
+        const compressed = await compressImage(file);
+        const blob = await (await fetch(compressed)).blob();
+        const uploadFile = new File(
+          [blob],
+          file.name.replace(/\.\w+$/, ".jpg"),
+          { type: "image/jpeg" }
+        );
+        const form = new FormData();
+        form.append("file", uploadFile);
+        form.append("tradeId", trade.id);
+        const res = await fetch("/api/upload", { method: "POST", body: form });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "upload failed");
+        added.push(json.screenshot as JournalScreenshot);
       }
       setJournal((j) => ({
         ...j,
@@ -285,10 +292,10 @@ export function TradeDetail({ trade }: Props) {
                   <button
                     type="button"
                     className="shot-open"
-                    onClick={() => setPreview(shot.dataUrl)}
+                    onClick={() => setPreview(shot.url || shot.dataUrl || null)}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={shot.dataUrl} alt={shot.name} />
+                    <img src={shot.url || shot.dataUrl} alt={shot.name} />
                   </button>
                   <button
                     type="button"
