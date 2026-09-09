@@ -15,6 +15,15 @@ export function hasR2(): boolean {
   );
 }
 
+/** Optional private bucket for journal JSON (recommended if shots bucket is public). */
+export function r2DataBucket(): string {
+  return (
+    process.env.R2_DATA_BUCKET?.trim() ||
+    process.env.R2_BUCKET?.trim() ||
+    ""
+  );
+}
+
 function hmac(key: Buffer | string, data: string) {
   return createHmac("sha256", key).update(data, "utf8").digest();
 }
@@ -28,34 +37,39 @@ function amzDate(d = new Date()) {
   return { amz: iso.slice(0, 16), date: iso.slice(0, 8) };
 }
 
-/** Upload bytes to Cloudflare R2 via S3 PutObject (SigV4). */
-export async function uploadToR2(options: {
+const EMPTY_HASH =
+  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+async function signedFetch(options: {
+  method: "GET" | "PUT";
+  bucket: string;
   key: string;
-  body: Buffer;
-  contentType: string;
-}): Promise<string> {
+  body?: Buffer;
+  contentType?: string;
+}): Promise<Response> {
   const accountId = required("R2_ACCOUNT_ID");
   const accessKey = required("R2_ACCESS_KEY_ID");
   const secretKey = required("R2_SECRET_ACCESS_KEY");
-  const bucket = required("R2_BUCKET");
-  const publicBase = process.env.R2_PUBLIC_BASE_URL?.trim();
-
   const host = `${accountId}.r2.cloudflarestorage.com`;
-  const path = `/${bucket}/${options.key}`;
+  const path = `/${options.bucket}/${options.key}`;
   const url = `https://${host}${path}`;
   const { amz, date } = amzDate();
   const region = "auto";
   const service = "s3";
-  const payloadHash = hashHex(options.body);
+  const payloadHash = options.body ? hashHex(options.body) : EMPTY_HASH;
+  const contentType = options.contentType ?? "application/octet-stream";
 
   const canonicalHeaders =
-    `content-type:${options.contentType}\n` +
+    (options.method === "PUT" ? `content-type:${contentType}\n` : "") +
     `host:${host}\n` +
     `x-amz-content-sha256:${payloadHash}\n` +
     `x-amz-date:${amz}\n`;
-  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+  const signedHeaders =
+    options.method === "PUT"
+      ? "content-type;host;x-amz-content-sha256;x-amz-date"
+      : "host;x-amz-content-sha256;x-amz-date";
   const canonicalRequest = [
-    "PUT",
+    options.method,
     path,
     "",
     canonicalHeaders,
@@ -83,16 +97,40 @@ export async function uploadToR2(options: {
     `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, ` +
     `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-  const res = await fetch(url, {
+  const headers: Record<string, string> = {
+    Host: host,
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": amz,
+    Authorization: authorization,
+  };
+  if (options.method === "PUT") {
+    headers["Content-Type"] = contentType;
+  }
+
+  return fetch(url, {
+    method: options.method,
+    headers,
+    body: options.body ? new Uint8Array(options.body) : undefined,
+  });
+}
+
+/** Upload bytes to Cloudflare R2 via S3 PutObject (SigV4). */
+export async function uploadToR2(options: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+  bucket?: string;
+  publicUrl?: boolean;
+}): Promise<string> {
+  const bucket = options.bucket || required("R2_BUCKET");
+  const publicBase = process.env.R2_PUBLIC_BASE_URL?.trim();
+
+  const res = await signedFetch({
     method: "PUT",
-    headers: {
-      "Content-Type": options.contentType,
-      Host: host,
-      "x-amz-content-sha256": payloadHash,
-      "x-amz-date": amz,
-      Authorization: authorization,
-    },
-    body: new Uint8Array(options.body),
+    bucket,
+    key: options.key,
+    body: options.body,
+    contentType: options.contentType,
   });
 
   if (!res.ok) {
@@ -100,8 +138,52 @@ export async function uploadToR2(options: {
     throw new Error(`R2 upload failed: ${res.status} ${text.slice(0, 200)}`);
   }
 
-  if (publicBase) {
+  if (options.publicUrl !== false && publicBase && bucket === process.env.R2_BUCKET?.trim()) {
     return `${publicBase.replace(/\/$/, "")}/${options.key}`;
   }
-  return url;
+  return `r2://${bucket}/${options.key}`;
+}
+
+/** Download object; returns null if missing. */
+export async function getFromR2(options: {
+  key: string;
+  bucket?: string;
+}): Promise<Buffer | null> {
+  const bucket = options.bucket || r2DataBucket();
+  if (!bucket) throw new Error("Missing R2 bucket");
+
+  const res = await signedFetch({
+    method: "GET",
+    bucket,
+    key: options.key,
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`R2 get failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
+export async function putJsonToR2(key: string, value: unknown): Promise<void> {
+  const bucket = r2DataBucket();
+  if (!bucket) throw new Error("Missing R2 data bucket");
+  await uploadToR2({
+    key,
+    body: Buffer.from(JSON.stringify(value, null, 2), "utf8"),
+    contentType: "application/json",
+    bucket,
+    publicUrl: false,
+  });
+}
+
+export async function getJsonFromR2<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const buf = await getFromR2({ key, bucket: r2DataBucket() });
+    if (!buf) return fallback;
+    return JSON.parse(buf.toString("utf8")) as T;
+  } catch {
+    return fallback;
+  }
 }
