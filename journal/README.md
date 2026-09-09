@@ -27,7 +27,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `SITE_PASSWORD` | Vercel 접속 잠금 |
 | `TV_WEBHOOK_SECRET` | TradingView webhook 인증 |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 셋업 푸시 |
-| `R2_*` | 스크린샷 영구 저장 (see R2 doc) |
+| `R2_*` | 스크린샷 영구 저장 (Cloudflare R2 — see [`../docs/R2-STORAGE.md`](../docs/R2-STORAGE.md)) |
 
 Legacy aliases `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` still work.
 
