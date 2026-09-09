@@ -103,3 +103,24 @@ export interface TradeStats {
   avgLoss: number;
   expectancy: number;
 }
+
+export interface PeriodSummaryResult {
+  rangeLabel: string;
+  from: number;
+  to: number;
+  tradeCount: number;
+  journaledCount: number;
+  stats: TradeStats;
+  longCount: number;
+  shortCount: number;
+  longPnl: number;
+  shortPnl: number;
+  checklistRates: { key: string; label: string; rate: number; n: number }[];
+  topBroken: { label: string; count: number }[];
+  biggestWin: { id: string; pnl: number } | null;
+  biggestLoss: { id: string; pnl: number } | null;
+  studyPoints: string[];
+  summary: string;
+  mode: "rules" | "ai";
+  generatedAt: number;
+}

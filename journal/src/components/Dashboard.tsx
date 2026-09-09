@@ -8,6 +8,7 @@ import { TradeList } from "@/components/TradeList";
 import { AlertFeed } from "@/components/AlertFeed";
 import { MonthlyTrendChart } from "@/components/MonthlyTrendChart";
 import { PnLCalendar } from "@/components/PnLCalendar";
+import { PeriodSummaryPanel } from "@/components/PeriodSummaryPanel";
 import { averageStopRisk, computeStats } from "@/lib/rules";
 import {
   dailyTotals,
@@ -142,6 +143,8 @@ export function Dashboard() {
       {message ? <p className="banner">{message}</p> : null}
 
       <StatsBar stats={stats} source={source} riskDollars={avgRisk} />
+
+      <PeriodSummaryPanel trades={filtered} monthFilter={monthFilter} />
 
       <AlertFeed />
 
