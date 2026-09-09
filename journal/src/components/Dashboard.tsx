@@ -77,15 +77,20 @@ export function Dashboard() {
       setTrades(json.trades ?? []);
       setSource(json.source ?? "unknown");
       setMessage(json.message ?? json.error ?? "");
-      setSelected(json.trades?.[0] ?? null);
+      setSelected((prev) => {
+        if (prev && json.trades?.some((t: ClosedTrade) => t.id === prev.id)) {
+          return prev;
+        }
+        return json.trades?.[0] ?? null;
+      });
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadTrades();
-  }, [loadTrades]);
+    void loadLive();
+  }, [loadLive]);
 
   useEffect(() => {
     if (!selected) {
