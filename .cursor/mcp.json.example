@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "bitget": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bitget-ai/bitget-agent-mcp",
+        "--read-only",
+        "--modules",
+        "account,trade,market"
+      ],
+      "env": {
+        "BITGET_API_KEY": "REPLACE_ME",
+        "BITGET_SECRET_KEY": "REPLACE_ME",
+        "BITGET_PASSPHRASE": "REPLACE_ME"
+      }
+    }
+  }
+}
