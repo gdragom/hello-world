@@ -6,9 +6,22 @@ type Props = {
   stats: TradeStats;
   source: string;
   riskDollars: number;
+  availableBalance?: number | null;
 };
 
-export function StatsBar({ stats, source, riskDollars }: Props) {
+function formatUsd(value: number): string {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+export function StatsBar({
+  stats,
+  source,
+  riskDollars,
+  availableBalance,
+}: Props) {
   return (
     <section className="stats-bar">
       <div>
@@ -37,6 +50,12 @@ export function StatsBar({ stats, source, riskDollars }: Props) {
       <div>
         <span className="label">Avg 1R</span>
         <strong>${riskDollars.toFixed(2)}</strong>
+      </div>
+      <div>
+        <span className="label">Available</span>
+        <strong>
+          {availableBalance == null ? "—" : `$${formatUsd(availableBalance)}`}
+        </strong>
       </div>
       <div>
         <span className="label">Source</span>

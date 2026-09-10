@@ -23,6 +23,7 @@ export function Dashboard() {
   const [trades, setTrades] = useState<ClosedTrade[]>([]);
   const [source, setSource] = useState("loading");
   const [message, setMessage] = useState("");
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
   const [selected, setSelected] = useState<ClosedTrade | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +60,11 @@ export function Dashboard() {
       setTrades(json.trades ?? []);
       setSource(json.source ?? "unknown");
       setMessage(json.message ?? json.error ?? "");
+      setAvailableBalance(
+        typeof json.balance?.available === "number"
+          ? json.balance.available
+          : null
+      );
       setSelected((prev) => {
         if (prev && json.trades?.some((t: ClosedTrade) => t.id === prev.id)) {
           return prev;
@@ -78,6 +84,11 @@ export function Dashboard() {
       setTrades(json.trades ?? []);
       setSource(json.source ?? "unknown");
       setMessage(json.message ?? json.error ?? "");
+      setAvailableBalance(
+        typeof json.balance?.available === "number"
+          ? json.balance.available
+          : null
+      );
       setSelected((prev) => {
         if (prev && json.trades?.some((t: ClosedTrade) => t.id === prev.id)) {
           return prev;
@@ -142,7 +153,12 @@ export function Dashboard() {
 
       {message ? <p className="banner">{message}</p> : null}
 
-      <StatsBar stats={stats} source={source} riskDollars={avgRisk} />
+      <StatsBar
+        stats={stats}
+        source={source}
+        riskDollars={avgRisk}
+        availableBalance={availableBalance}
+      />
 
       <PeriodSummaryPanel trades={filtered} monthFilter={monthFilter} />
 

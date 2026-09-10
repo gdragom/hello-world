@@ -118,6 +118,60 @@ function normalizeInterval(granularity: string): string {
   return map[granularity] ?? "15m";
 }
 
+export type BitgetAccountBalance = {
+  coin: string;
+  available: number;
+  equity: number;
+};
+
+function mapAssetRow(row: HistoryRow): BitgetAccountBalance | null {
+  const coin = str(row.coin || row.marginCoin || row.currency).toUpperCase();
+  if (!coin) return null;
+  const available = num(
+    row.available ??
+      row.availableBalance ??
+      row.crossedMaxAvailable ??
+      row.maxTransferOut
+  );
+  const equity = num(
+    row.equity ?? row.accountEquity ?? row.usdtEquity ?? row.available
+  );
+  return { coin, available, equity };
+}
+
+/** USDT available (and equity) from Bitget account assets. */
+export async function fetchBitgetAccountBalance(options?: {
+  coin?: string;
+}): Promise<BitgetAccountBalance | null> {
+  if (!hasBitgetCredentials()) {
+    throw new Error(
+      "Bitget credentials missing. Set BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE (same as Bitget MCP)."
+    );
+  }
+
+  const want = (options?.coin ?? "USDT").toUpperCase();
+  const client = createClient();
+  const result = await client.callOperation<unknown>("getAccountAssets", {});
+  const payload = result.data;
+  let rows: HistoryRow[] = unwrapList(payload);
+  if (
+    rows.length === 0 &&
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as Record<string, unknown>).assets)
+  ) {
+    rows = (payload as { assets: HistoryRow[] }).assets;
+  }
+  const mapped = rows
+    .map(mapAssetRow)
+    .filter((row): row is BitgetAccountBalance => Boolean(row));
+  const hit =
+    mapped.find((row) => row.coin === want) ??
+    mapped.find((row) => row.coin.includes(want)) ??
+    null;
+  return hit;
+}
+
 export async function fetchBitgetClosedPositions(options?: {
   symbol?: string;
   limit?: number;
