@@ -1,0 +1,6 @@
+# Local Bitget MCP credentials (copy from mcp.json.example)
+.cursor/mcp.json
+
+# OS / editor
+.DS_Store
+*.pem
