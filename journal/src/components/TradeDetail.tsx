@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compressImage } from "@/lib/image";
 import { RULE_LABELS } from "@/lib/rules";
 import type {
@@ -29,6 +29,53 @@ const verdictLabel: Record<ReviewResult["verdict"], string> = {
   unclear: "판단 보류",
 };
 
+/** iPad Safari often leaves type empty and puts images in items, not files. */
+function isLikelyImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) return true;
+  const name = file.name || "";
+  if (/\.(png|jpe?g|gif|webp|heic|heif|bmp)$/i.test(name)) return true;
+  if (!file.type && /^image/i.test(name || "image")) return true;
+  return false;
+}
+
+function normalizeImageFile(file: File): File {
+  if (file.type) return file;
+  const lower = (file.name || "").toLowerCase();
+  const type = lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+    ? "image/jpeg"
+    : lower.endsWith(".webp")
+      ? "image/webp"
+      : lower.endsWith(".gif")
+        ? "image/gif"
+        : "image/png";
+  return new File([file], file.name || `paste-${Date.now()}.png`, { type });
+}
+
+function filesFromDataTransfer(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const out: File[] = [];
+  const seen = new Set<string>();
+  const push = (file: File | null) => {
+    if (!file || !isLikelyImageFile(file)) return;
+    const key = `${file.name}:${file.size}:${file.lastModified}:${file.type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(normalizeImageFile(file));
+  };
+  if (data.files?.length) {
+    for (const file of Array.from(data.files)) push(file);
+  }
+  if (data.items?.length) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== "file") continue;
+      if (item.type.startsWith("image/") || !item.type) {
+        push(item.getAsFile());
+      }
+    }
+  }
+  return out;
+}
+
 export function TradeDetail({ trade }: Props) {
   const risk = stopLossUsd(trade);
   const range = stopRange(trade);
@@ -48,6 +95,7 @@ export function TradeDetail({ trade }: Props) {
   const [status, setStatus] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,8 +141,10 @@ export function TradeDetail({ trade }: Props) {
     [journal.checklist]
   );
 
-  async function addFiles(files: FileList | File[]) {
-    const list = [...files].filter((f) => f.type.startsWith("image/"));
+  const addFiles = useCallback(async (files: FileList | File[]) => {
+    const list = [...files]
+      .map((f) => normalizeImageFile(f))
+      .filter((f) => isLikelyImageFile(f));
     if (!list.length) return;
     setStatus("차트 업로드 중…");
     try {
@@ -104,7 +154,7 @@ export function TradeDetail({ trade }: Props) {
         const blob = await (await fetch(compressed)).blob();
         const uploadFile = new File(
           [blob],
-          file.name.replace(/\.\w+$/, ".jpg"),
+          (file.name || "paste.png").replace(/\.\w+$/, ".jpg"),
           { type: "image/jpeg" }
         );
         const form = new FormData();
@@ -123,7 +173,21 @@ export function TradeDetail({ trade }: Props) {
     } catch {
       setStatus("첨부 실패");
     }
-  }
+  }, [trade.id]);
+
+  // iPad Safari: clipboard images live in items; paste often targets body/textarea.
+  // Capture-phase document listener so paste works without focusing the drop zone.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const files = filesFromDataTransfer(e.clipboardData);
+      if (!files.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void addFiles(files);
+    };
+    document.addEventListener("paste", onPaste, true);
+    return () => document.removeEventListener("paste", onPaste, true);
+  }, [addFiles]);
 
   async function saveJournal() {
     setSaving(true);
@@ -256,7 +320,8 @@ export function TradeDetail({ trade }: Props) {
           </button>
         </div>
         <p className="attach-hint">
-          스크린샷을 고르거나, 이 칸에 붙여넣기(Ctrl+V) 하세요.
+          스크린샷을 고르거나 붙여넣기 하세요. iPad: TradingView에서 복사 → 이
+          트레이드 화면에서 붙여넣기 (칸을 탭할 필요 없음).
         </p>
         <input
           ref={fileRef}
@@ -270,19 +335,22 @@ export function TradeDetail({ trade }: Props) {
           }}
         />
         <div
+          ref={dropRef}
           className="attach-drop"
           tabIndex={0}
+          role="region"
+          aria-label="차트 첨부 · 붙여넣기"
+          onClick={() => dropRef.current?.focus()}
           onPaste={(e) => {
-            const files = [...e.clipboardData.files];
-            if (files.length) {
-              e.preventDefault();
-              void addFiles(files);
-            }
+            const files = filesFromDataTransfer(e.clipboardData);
+            if (!files.length) return;
+            e.preventDefault();
+            void addFiles(files);
           }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            void addFiles(e.dataTransfer.files);
+            void addFiles(filesFromDataTransfer(e.dataTransfer));
           }}
         >
           {(journal.screenshots ?? []).length ? (

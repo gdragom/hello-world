@@ -13,6 +13,9 @@ export function compressImage(file: File, maxWidth = 1400, quality = 0.72) {
         reject(new Error("canvas"));
         return;
       }
+      // Opaque white underlay — iOS PNG paste can have transparency that looks black in JPEG
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL("image/jpeg", quality));

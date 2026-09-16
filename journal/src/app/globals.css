@@ -605,10 +605,14 @@ button.secondary {
   color: var(--muted);
   font-size: 12px;
   outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
 }
 
 .attach-drop:focus {
   border-color: rgba(232, 168, 56, 0.6);
+  box-shadow: 0 0 0 2px rgba(232, 168, 56, 0.15);
 }
 
 .shot-grid {
