@@ -50,11 +50,12 @@ sudo systemctl restart ledger
 
 ## Open from iPhone
 
-1. Connect **Shadowrocket / WireGuard**
+1. Connect **Shadowrocket** (WireGuard or VLESS profile for `max-trading.duckdns.org`)
 2. Safari → `http://10.8.0.1:3000`  
    (or your Pi LAN IP, e.g. `http://192.168.x.x:3000`)
 
 Do **not** port-forward 3000 on Deco unless you intentionally want it public.
+Port **443** is reserved for VLESS — keep the journal private behind VPN.
 
 ## Useful commands
 
