@@ -50,6 +50,22 @@ CLIENT_NAME=laptop sudo -E ./setup-wireguard.sh
 # for multiple clients, or ask for an add-peer helper.
 ```
 
+## DuckDNS (recommended before travel)
+
+You only create the name/token on the website; the Pi script does the rest:
+
+1. Sign in at https://www.duckdns.org and create a subdomain (e.g. `tradingpi`)
+2. On the Pi:
+
+```bash
+cd ~/hello-world/pi-vpn   # or wherever you cloned the repo
+chmod +x setup-duckdns.sh
+sudo DUCKDNS_DOMAIN=tradingpi DUCKDNS_TOKEN=your-token-here ./setup-duckdns.sh
+```
+
+That installs a 5‑minute cron updater and rewrites `/etc/wireguard/clients/*.conf`  
+`Endpoint` to `tradingpi.duckdns.org:51820`. Re-import `iphone.conf` into Shadowrocket.
+
 ## After VPN works
 
 Host LEDGER journal on the Pi and open `http://10.8.0.1:3000` (or Pi LAN IP) from the phone while VPN is connected — no public web exposure required.
