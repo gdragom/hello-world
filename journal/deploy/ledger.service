@@ -1,0 +1,22 @@
+[Unit]
+Description=LEDGER Bitget trading journal (Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__JOURNAL__
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=0.0.0.0
+# Next.js loads journal/.env.local from WorkingDirectory (do not use systemd
+# EnvironmentFile — .env comments/empty keys can break unit parsing).
+ExecStart=__NPM__ run start -- --hostname 0.0.0.0 --port 3000
+Restart=on-failure
+RestartSec=5
+# Give Node room on Pi
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+qrcodes/
+secrets.env
+.env
+.env.local
+*.pem
+*.key
+client-*.txt
+vless-client.txt
+iphone.conf
