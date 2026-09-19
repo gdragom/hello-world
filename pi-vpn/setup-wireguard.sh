@@ -112,8 +112,13 @@ EOF
 chmod 600 "${CONF}"
 
 echo "==> Writing client config ${CLIENT_CONF_FILE}"
-# AllowedIPs = 0.0.0.0/0 sends ALL phone traffic through Pi (full tunnel).
-# For home-LAN-only access, use: AllowedIPs = 10.8.0.0/24, 192.168.0.0/16
+# Default: split tunnel — only home VPN/LAN via Pi; phone keeps normal internet.
+# Full tunnel (all traffic via Pi): WG_FULL_TUNNEL=1
+if [[ "${WG_FULL_TUNNEL:-0}" == "1" ]]; then
+  CLIENT_ALLOWED_IPS="0.0.0.0/0"
+else
+  CLIENT_ALLOWED_IPS="10.8.0.0/24, 192.168.0.0/16, 10.0.0.0/8"
+fi
 cat >"${CLIENT_CONF_FILE}" <<EOF
 [Interface]
 PrivateKey = ${CLIENT_PRIV}
@@ -123,7 +128,7 @@ DNS = 1.1.1.1
 [Peer]
 PublicKey = ${SERVER_PUB}
 Endpoint = ${ENDPOINT}
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = ${CLIENT_ALLOWED_IPS}
 PersistentKeepalive = 25
 EOF
 chmod 600 "${CLIENT_CONF_FILE}"
