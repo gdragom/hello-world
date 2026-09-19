@@ -1,71 +1,70 @@
-# Raspberry Pi WireGuard VPN (Shadowrocket)
+# Raspberry Pi remote access: DuckDNS + WireGuard + VLESS
 
-Sets up a WireGuard server on Ubuntu so your iPhone (Shadowrocket) can reach home from anywhere.
+Hostname used in these scripts: **`max-trading.duckdns.org`**
 
-## On the Pi
+## Security first
 
-```bash
-# copy setup-wireguard.sh to the Pi, then:
-sudo apt update
-chmod +x setup-wireguard.sh
-sudo ./setup-wireguard.sh
-```
+If your DuckDNS **token** appeared in a screenshot or chat, open https://www.duckdns.org and **regenerate / use a new token** before saving it on the Pi. Never commit `secrets.env` to git.
 
-If public IP detection fails:
+## One-shot (recommended)
+
+On the Pi:
 
 ```bash
-SERVER_PUBLIC_IP=YOUR.PUBLIC.IP sudo -E ./setup-wireguard.sh
+cd ~
+git clone https://github.com/gdragom/hello-world.git
+cd hello-world
+git checkout cursor/pi-wireguard-vpn-e86f
+git pull
+
+cd pi-vpn
+cp secrets.env.example secrets.env
+nano secrets.env   # set DUCKDNS_TOKEN=...  (domain already max-trading)
+
+chmod +x setup-*.sh
+sudo ./setup-remote-access.sh
 ```
 
-## Router
+## Deco port forwards
 
-1. Give the Pi a **DHCP reservation** (fixed LAN IP)
-2. Port forward: **UDP 51820 → Pi LAN IP : 51820**
-3. If your ISP uses **CGNAT**, port forward will not work from the internet — use Tailscale instead, or a cheap VPS relay
+| Protocol | Port | To |
+|----------|------|-----|
+| **UDP** | 51820 | Pi LAN IP (WireGuard) |
+| **TCP** | 443 | Pi LAN IP (VLESS) |
 
-## iPhone (Shadowrocket)
+Keep Pi DHCP reservation as you already did.
 
-1. Get `/etc/wireguard/clients/iphone.conf` from the Pi  
-   ```bash
-   sudo cat /etc/wireguard/clients/iphone.conf
-   ```
-2. Shadowrocket → **+** → type **WireGuard** → paste/import config  
-   (Or use the official WireGuard iOS app and scan the QR the script prints)
-3. Turn the profile **on**
-4. Test on **cellular data** (turn Wi‑Fi off)
+## Shadowrocket
 
-## Useful commands (Pi)
+**Profile A — WireGuard**
+```bash
+sudo cat /etc/wireguard/clients/iphone.conf
+```
+Endpoint should be `max-trading.duckdns.org:51820`.
+
+**Profile B — VLESS (China / UDP-blocked networks)**
+```bash
+sudo cat /usr/local/etc/xray/vless-shadowrocket.txt
+```
+Import the `vless://...` link in Shadowrocket.
+
+## LEDGER journal (local storage, no Cloudflare R2)
 
 ```bash
-sudo wg show
-sudo systemctl status wg-quick@wg0
-sudo systemctl restart wg-quick@wg0
+cd ~/hello-world
+./journal/deploy/pi-setup.sh
+nano journal/.env.local   # Bitget keys + SITE_PASSWORD; leave R2_* empty
+sudo systemctl restart ledger
 ```
 
-## Add another device later
+On phone with VPN/VLESS connected: `http://10.8.0.1:3000`  
+Do **not** put the journal on public port 443 (that port is for VLESS).
 
-```bash
-CLIENT_NAME=laptop sudo -E ./setup-wireguard.sh
-# Note: re-running regenerates only missing keys; edit wg0.conf peers manually
-# for multiple clients, or ask for an add-peer helper.
-```
+## Scripts
 
-## DuckDNS (recommended before travel)
-
-You only create the name/token on the website; the Pi script does the rest:
-
-1. Sign in at https://www.duckdns.org and create a subdomain (e.g. `tradingpi`)
-2. On the Pi:
-
-```bash
-cd ~/hello-world/pi-vpn   # or wherever you cloned the repo
-chmod +x setup-duckdns.sh
-sudo DUCKDNS_DOMAIN=tradingpi DUCKDNS_TOKEN=your-token-here ./setup-duckdns.sh
-```
-
-That installs a 5‑minute cron updater and rewrites `/etc/wireguard/clients/*.conf`  
-`Endpoint` to `tradingpi.duckdns.org:51820`. Re-import `iphone.conf` into Shadowrocket.
-
-## After VPN works
-
-Host LEDGER journal on the Pi and open `http://10.8.0.1:3000` (or Pi LAN IP) from the phone while VPN is connected — no public web exposure required.
+| Script | Purpose |
+|--------|---------|
+| `setup-duckdns.sh` | Cron updater + rewrite WG Endpoint |
+| `setup-wireguard.sh` | WG server; Endpoint defaults to DuckDNS |
+| `setup-vless.sh` | Xray VLESS + Reality on TCP 443 |
+| `setup-remote-access.sh` | Runs the three above in order |

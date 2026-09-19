@@ -21,6 +21,14 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/secrets.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "${SCRIPT_DIR}/secrets.env"
+  set +a
+fi
+
 VPN_PORT="${VPN_PORT:-51820}"
 VPN_SUBNET="${VPN_SUBNET:-10.8.0.0/24}"
 VPN_SERVER_IP="${VPN_SERVER_IP:-10.8.0.1}"
@@ -28,6 +36,10 @@ CLIENT_NAME="${CLIENT_NAME:-iphone}"
 WG_DIR="/etc/wireguard"
 CLIENT_DIR="${WG_DIR}/clients"
 CONF="${WG_DIR}/wg0.conf"
+# Prefer DuckDNS hostname for Shadowrocket Endpoint (survives ISP IP changes)
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN:-max-trading}"
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN%.duckdns.org}"
+ENDPOINT_HOST="${ENDPOINT_HOST:-${DUCKDNS_DOMAIN}.duckdns.org}"
 
 echo "==> Installing packages"
 export DEBIAN_FRONTEND=noninteractive
@@ -42,18 +54,16 @@ if [[ -z "${WAN_IF}" ]]; then
 fi
 echo "==> WAN interface: ${WAN_IF}"
 
-# Public IP for client endpoint (override with SERVER_PUBLIC_IP=x.x.x.x)
+# Endpoint host: DuckDNS by default; raw IP only if ENDPOINT_HOST forced empty
 if [[ -z "${SERVER_PUBLIC_IP:-}" ]]; then
   SERVER_PUBLIC_IP="$(curl -4 -fsS --max-time 8 https://ifconfig.me || true)"
 fi
 if [[ -z "${SERVER_PUBLIC_IP}" ]]; then
   SERVER_PUBLIC_IP="$(curl -4 -fsS --max-time 8 https://api.ipify.org || true)"
 fi
-if [[ -z "${SERVER_PUBLIC_IP}" ]]; then
-  echo "Could not detect public IP. Re-run with: SERVER_PUBLIC_IP=YOUR.IP.HERE sudo -E $0"
-  exit 1
-fi
-echo "==> Public endpoint: ${SERVER_PUBLIC_IP}:${VPN_PORT}"
+ENDPOINT="${ENDPOINT_HOST}:${VPN_PORT}"
+echo "==> Client Endpoint: ${ENDPOINT}"
+echo "==> Current public IP (for DuckDNS check): ${SERVER_PUBLIC_IP:-unknown}"
 
 echo "==> Enabling IPv4 forwarding"
 install -d -m 0755 /etc/sysctl.d
@@ -112,7 +122,7 @@ DNS = 1.1.1.1
 
 [Peer]
 PublicKey = ${SERVER_PUB}
-Endpoint = ${SERVER_PUBLIC_IP}:${VPN_PORT}
+Endpoint = ${ENDPOINT}
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF

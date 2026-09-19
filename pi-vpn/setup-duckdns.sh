@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # DuckDNS updater for Ubuntu Raspberry Pi + optional WireGuard Endpoint rewrite.
 #
-# 1) Create a free name at https://www.duckdns.org (sign in with GitHub/Google)
-# 2) Copy your token and subdomain (e.g. myhome → myhome.duckdns.org)
-# 3) On the Pi:
-#      sudo DUCKDNS_DOMAIN=myhome DUCKDNS_TOKEN=xxxxxxxx ./setup-duckdns.sh
+# Preferred:
+#   cp secrets.env.example secrets.env   # set DUCKDNS_TOKEN on the Pi only
+#   sudo ./setup-duckdns.sh
+#
+# Or:
+#   sudo DUCKDNS_DOMAIN=max-trading DUCKDNS_TOKEN=xxxxxxxx ./setup-duckdns.sh
 #
 # Optional:
 #   UPDATE_WIREGUARD=1   rewrite Endpoint in /etc/wireguard/clients/*.conf
@@ -12,30 +14,38 @@
 set -euo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run as root: sudo DUCKDNS_DOMAIN=... DUCKDNS_TOKEN=... $0"
+  echo "Run as root: sudo $0"
   exit 1
 fi
 
-DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN:-}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/secrets.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "${SCRIPT_DIR}/secrets.env"
+  set +a
+  echo "==> Loaded ${SCRIPT_DIR}/secrets.env"
+fi
+
+DUCKDNS_DOMAIN="${DUCKDNS_DOMAIN:-max-trading}"
 DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-}"
 UPDATE_WIREGUARD="${UPDATE_WIREGUARD:-1}"
 VPN_PORT="${VPN_PORT:-51820}"
 INSTALL_DIR="/opt/duckdns"
 LOG_FILE="/var/log/duckdns.log"
 
-if [[ -z "${DUCKDNS_DOMAIN}" || -z "${DUCKDNS_TOKEN}" ]]; then
+if [[ -z "${DUCKDNS_TOKEN}" ]]; then
   cat <<'EOF'
-Missing DUCKDNS_DOMAIN and/or DUCKDNS_TOKEN.
+Missing DUCKDNS_TOKEN.
 
-1. Open https://www.duckdns.org and sign in
-2. Create a subdomain (example: tradingpi)
-3. Copy the token shown on the page
-4. Re-run:
+On the Pi:
+  cd ~/hello-world/pi-vpn
+  cp secrets.env.example secrets.env
+  nano secrets.env    # DUCKDNS_DOMAIN=max-trading and DUCKDNS_TOKEN=...
 
-   sudo DUCKDNS_DOMAIN=tradingpi DUCKDNS_TOKEN=your-token-here \
-     ./setup-duckdns.sh
+  sudo ./setup-duckdns.sh
 
-Optional: UPDATE_WIREGUARD=0 to skip rewriting WireGuard client configs.
+If your token was shown in a screenshot/chat, regenerate it on DuckDNS first.
 EOF
   exit 1
 fi
@@ -99,7 +109,6 @@ if [[ "${UPDATE_WIREGUARD}" == "1" ]]; then
       if grep -q '^Endpoint' "${conf}"; then
         sed -i "s|^Endpoint = .*|Endpoint = ${FQDN}:${VPN_PORT}|" "${conf}"
       else
-        # Insert under [Peer] if missing
         awk -v ep="Endpoint = ${FQDN}:${VPN_PORT}" '
           /^\[Peer\]/ { print; print ep; next }
           /^Endpoint/ { next }
@@ -110,10 +119,10 @@ if [[ "${UPDATE_WIREGUARD}" == "1" ]]; then
       echo "    updated $(basename "${conf}")"
     done
     echo
-    echo "Re-import the client config into Shadowrocket (or edit Endpoint manually):"
+    echo "Re-import into Shadowrocket:"
     echo "  sudo cat /etc/wireguard/clients/iphone.conf"
   else
-    echo "==> No ${CLIENT_DIR} yet — skip WireGuard rewrite (run WireGuard setup first)."
+    echo "==> No ${CLIENT_DIR} yet — skip WireGuard rewrite."
   fi
 fi
 
@@ -126,12 +135,10 @@ cat <<EOF
  Cron:     every 5 minutes (/etc/cron.d/duckdns)
  Log:      ${LOG_FILE}
 
- Shadowrocket WireGuard Endpoint should be:
+ Shadowrocket WireGuard Endpoint:
    ${FQDN}:${VPN_PORT}
 
- Test:
-   dig +short ${FQDN}
-   curl -4 ifconfig.me
-
- Next (optional China-resilient backup): Trojan/VLESS on TCP 443.
+ Next:
+   sudo ./setup-vless.sh     # China-resilient backup on TCP 443
+   ./journal/deploy/pi-setup.sh   # LEDGER on the Pi
 EOF
