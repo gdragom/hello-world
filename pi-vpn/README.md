@@ -25,6 +25,23 @@ chmod +x setup-*.sh
 sudo ./setup-remote-access.sh
 ```
 
+## Shadowrocket QR codes (no typing)
+
+On the Pi:
+
+```bash
+cd ~/hello-world/pi-vpn
+git pull
+chmod +x make-shadowrocket-qrs.sh
+sudo ./make-shadowrocket-qrs.sh
+```
+
+Scan the two terminal QR codes with Shadowrocket (**+ → Scan QR Code**):
+1. **WireGuard** = Profile A  
+2. **VLESS** = Profile B  
+
+PNG copies are saved under `pi-vpn/qrcodes/` if you prefer scanning from the Pi desktop image viewer.
+
 ## Deco port forwards
 
 | Protocol | Port | To |
