@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LEDGER · TV vs Python</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --ink: #1c1914;
+      --muted: #6b6458;
+      --panel: #fffdf8;
+      --line: #ddd4c4;
+      --tv: #1f6feb;
+      --py: #c45c26;
+      --both: #1a7f4b;
+      --fib: #c9a227;
+      --fvg: rgba(45, 140, 90, 0.18);
+      --fvg-edge: rgba(45, 140, 90, 0.55);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #efe6d4 0%, transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, #e7efe8 0%, transparent 55%),
+        var(--bg);
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+      gap: 0;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 1.1rem 1.4rem 0.85rem;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 88%, transparent);
+      backdrop-filter: blur(8px);
+    }
+    header h1 {
+      font-family: Fraunces, Georgia, serif;
+      font-weight: 700;
+      font-size: 1.55rem;
+      margin: 0;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    header p {
+      margin: 0.25rem 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      max-width: 52ch;
+    }
+    .toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: flex-end;
+    }
+    .toggles label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggles input { accent-color: var(--ink); }
+    #chart {
+      min-height: 0;
+      height: 100%;
+      padding: 0.4rem 0.4rem 0.4rem 0.6rem;
+    }
+    aside {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .stats {
+      padding: 1rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem 0.75rem;
+    }
+    .stat span {
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .stat strong {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .legend {
+      padding: 0.7rem 1rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      line-height: 1.45;
+    }
+    .dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.25rem; vertical-align: middle; }
+    .list-head {
+      padding: 0.65rem 1rem 0.35rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+    .trades {
+      overflow: auto;
+      flex: 1;
+      padding: 0 0.5rem 1rem;
+    }
+    .trade {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 0.55rem 0.65rem;
+      margin: 0.35rem 0.4rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    .trade:hover { border-color: #b9ae9a; }
+    .trade .row { display: flex; justify-content: space-between; gap: 0.5rem; }
+    .trade .src { font-weight: 600; font-size: 0.7rem; letter-spacing: 0.04em; }
+    .trade .src.tv { color: var(--tv); }
+    .trade .src.py { color: var(--py); }
+    .trade .src.both { color: var(--both); }
+    .trade .mono { font-family: "IBM Plex Mono", monospace; }
+    .win { color: #1a7f4b; }
+    .loss { color: #b42318; }
+    .err {
+      padding: 2rem;
+      color: #b42318;
+      font-family: "IBM Plex Mono", monospace;
+    }
+    @media (max-width: 960px) {
+      .shell { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+      aside { border-left: none; border-top: 1px solid var(--line); max-height: 40vh; }
+      header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>LEDGER parity</h1>
+        <p id="subtitle">Loading Bitget 1H · Python fib/FVG · TV List of Trades…</p>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="togTv" checked /> TV entries</label>
+        <label><input type="checkbox" id="togPy" checked /> Python entries</label>
+        <label><input type="checkbox" id="togFib" checked /> Fib 0.5 / floor</label>
+        <label><input type="checkbox" id="togFvg" checked /> 1H FVG</label>
+        <label><input type="checkbox" id="togBos" checked /> BOS marks</label>
+      </div>
+    </header>
+    <div id="chart"></div>
+    <aside>
+      <div class="stats" id="stats"></div>
+      <div class="legend">
+        <span class="dot" style="background:var(--tv)"></span>TV only
+        · <span class="dot" style="background:var(--py)"></span>Python only
+        · <span class="dot" style="background:var(--both)"></span>Same hour
+        · gold = fib 0.5 · teal band = FVG
+      </div>
+      <div class="list-head">Entries (click to zoom)</div>
+      <div class="trades" id="trades"></div>
+    </aside>
+  </div>
+  <script>
+    const COLORS = {
+      tv: "#1f6feb",
+      py: "#c45c26",
+      both: "#1a7f4b",
+      fib: "#c9a227",
+      floor: "#2a9d8f",
+      up: "#2f6b4f",
+      down: "#a33b2b",
+    };
+
+    let DATA = null;
+
+    function hourKey(iso) {
+      const d = new Date(iso);
+      d.setUTCMinutes(0, 0, 0);
+      return d.toISOString();
+    }
+
+    function buildTradeIndex(data) {
+      const tvH = new Set(data.tv_entries.map(e => hourKey(e.time)));
+      const pyH = new Set(data.py_entries.map(e => hourKey(e.time)));
+      const rows = [];
+      for (const e of data.tv_entries) {
+        const h = hourKey(e.time);
+        rows.push({ ...e, src: pyH.has(h) ? "both" : "tv", label: pyH.has(h) ? "BOTH" : "TV" });
+      }
+      for (const e of data.py_entries) {
+        const h = hourKey(e.time);
+        if (tvH.has(h)) continue;
+        rows.push({ ...e, src: "py", label: "PY" });
+      }
+      rows.sort((a, b) => a.time.localeCompare(b.time));
+      return rows;
+    }
+
+    function shapesFromData(data, flags) {
+      const shapes = [];
+      if (flags.fvg) {
+        for (const z of data.fvgs) {
+          shapes.push({
+            type: "rect",
+            xref: "x", yref: "y",
+            x0: z.t0, x1: z.t1,
+            y0: z.bot, y1: z.top,
+            fillcolor: "rgba(45,140,90,0.16)",
+            line: { width: 1, color: "rgba(45,140,90,0.45)" },
+            layer: "below",
+          });
+        }
+      }
+      if (flags.fib) {
+        for (const f of data.fibs) {
+          shapes.push({
+            type: "line", xref: "x", yref: "y",
+            x0: f.t0, x1: f.t1, y0: f.eq, y1: f.eq,
+            line: { color: COLORS.fib, width: 2 },
+            layer: "above",
+          });
+          shapes.push({
+            type: "line", xref: "x", yref: "y",
+            x0: f.t0, x1: f.t1, y0: f.lo, y1: f.lo,
+            line: { color: COLORS.floor, width: 1.5, dash: "dot" },
+            layer: "above",
+          });
+        }
+      }
+      return shapes;
+    }
+
+    function entryTrace(entries, name, color, symbol) {
+      return {
+        type: "scatter",
+        mode: "markers",
+        name,
+        x: entries.map(e => e.time),
+        y: entries.map(e => e.price),
+        text: entries.map(e => `${name}<br>${e.time}<br>${e.price}<br>PnL ${Number(e.pnl).toFixed(1)}`),
+        hoverinfo: "text",
+        marker: {
+          size: 11,
+          color,
+          symbol,
+          line: { width: 1, color: "#fffdf8" },
+        },
+      };
+    }
+
+    function renderChart(data) {
+      const flags = {
+        tv: document.getElementById("togTv").checked,
+        py: document.getElementById("togPy").checked,
+        fib: document.getElementById("togFib").checked,
+        fvg: document.getElementById("togFvg").checked,
+        bos: document.getElementById("togBos").checked,
+      };
+
+      const tvH = new Set(data.tv_entries.map(e => hourKey(e.time)));
+      const pyH = new Set(data.py_entries.map(e => hourKey(e.time)));
+      const both = data.tv_entries.filter(e => pyH.has(hourKey(e.time)));
+      const tvOnly = data.tv_entries.filter(e => !pyH.has(hourKey(e.time)));
+      const pyOnly = data.py_entries.filter(e => !tvH.has(hourKey(e.time)));
+
+      const traces = [
+        {
+          type: "candlestick",
+          name: "BTC 1H",
+          x: data.candles.map(c => c.time),
+          open: data.candles.map(c => c.open),
+          high: data.candles.map(c => c.high),
+          low: data.candles.map(c => c.low),
+          close: data.candles.map(c => c.close),
+          increasing: { line: { color: COLORS.up } },
+          decreasing: { line: { color: COLORS.down } },
+          whiskerwidth: 0.4,
+        },
+      ];
+      if (flags.tv) traces.push(entryTrace(tvOnly, "TV only", COLORS.tv, "triangle-up"));
+      if (flags.py) traces.push(entryTrace(pyOnly, "Python only", COLORS.py, "triangle-up"));
+      if (flags.tv || flags.py) traces.push(entryTrace(both, "Matched hour", COLORS.both, "diamond"));
+      if (flags.bos) {
+        traces.push({
+          type: "scatter",
+          mode: "markers",
+          name: "BOS↑",
+          x: data.bos.map(b => b.time),
+          y: data.bos.map(b => b.level),
+          marker: { size: 7, color: "#3d7a5a", symbol: "line-ew-open", line: { width: 2 } },
+          hovertext: data.bos.map(b => `BOS ${b.level}`),
+          hoverinfo: "text",
+        });
+      }
+
+      const layout = {
+        margin: { l: 56, r: 16, t: 18, b: 40 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "#fffdf8",
+        font: { family: "IBM Plex Sans, sans-serif", color: "#1c1914", size: 11 },
+        xaxis: {
+          rangeslider: { visible: true, thickness: 0.08 },
+          gridcolor: "#ece4d6",
+          type: "date",
+        },
+        yaxis: { gridcolor: "#ece4d6", side: "right", fixedrange: false },
+        legend: { orientation: "h", y: 1.08, x: 0, font: { size: 11 } },
+        shapes: shapesFromData(data, flags),
+        dragmode: "zoom",
+      };
+
+      Plotly.react("chart", traces, layout, {
+        responsive: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ["lasso2d", "select2d"],
+      });
+    }
+
+    function renderAside(data) {
+      const s = data.stats;
+      document.getElementById("stats").innerHTML = `
+        <div class="stat"><span>TV trades</span><strong>${s.tv_trades}</strong></div>
+        <div class="stat"><span>Python trades</span><strong>${s.py_trades}</strong></div>
+        <div class="stat"><span>Same hour</span><strong>${s.matched_entry_hours}</strong></div>
+        <div class="stat"><span>Fib / FVG</span><strong>${s.fib_segments} / ${s.fvg_boxes}</strong></div>
+        <div class="stat"><span>PY WR</span><strong>${s.py_wr}%</strong></div>
+        <div class="stat"><span>PY PF</span><strong>${s.py_pf}</strong></div>
+      `;
+      document.getElementById("subtitle").textContent =
+        `${data.meta.symbol} · ${data.meta.tf} · ${data.meta.from.slice(0,10)} → now · ${data.meta.config}`;
+
+      const rows = buildTradeIndex(data);
+      const el = document.getElementById("trades");
+      el.innerHTML = rows.map((r, i) => {
+        const pnlCls = r.pnl >= 0 ? "win" : "loss";
+        return `<div class="trade" data-i="${i}" data-t="${r.time}">
+          <div class="row"><span class="src ${r.src}">${r.label}</span>
+            <span class="mono ${pnlCls}">${r.pnl >= 0 ? "+" : ""}${Number(r.pnl).toFixed(0)}</span></div>
+          <div class="row mono" style="margin-top:0.2rem;color:var(--muted)">${r.time.replace("T"," ").replace("Z","")}</div>
+          <div class="row mono">${Number(r.price).toFixed(1)}</div>
+        </div>`;
+      }).join("");
+
+      el.querySelectorAll(".trade").forEach(node => {
+        node.addEventListener("click", () => {
+          const t = node.getAttribute("data-t");
+          const start = new Date(t);
+          start.setUTCDate(start.getUTCDate() - 3);
+          const end = new Date(t);
+          end.setUTCDate(end.getUTCDate() + 5);
+          Plotly.relayout("chart", {
+            "xaxis.range": [start.toISOString(), end.toISOString()],
+          });
+        });
+      });
+    }
+
+    function wireToggles() {
+      ["togTv","togPy","togFib","togFvg","togBos"].forEach(id => {
+        document.getElementById(id).addEventListener("change", () => renderChart(DATA));
+      });
+    }
+
+    async function boot() {
+      try {
+        const res = await fetch("/data.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        DATA = await res.json();
+        renderAside(DATA);
+        renderChart(DATA);
+        wireToggles();
+        window.addEventListener("resize", () => Plotly.Plots.resize("chart"));
+      } catch (err) {
+        document.getElementById("chart").innerHTML =
+          `<div class="err">Failed to load data.json<br>${err}<br>Run: python serve.py</div>`;
+      }
+    }
+    boot();
+  </script>
+</body>
+</html>

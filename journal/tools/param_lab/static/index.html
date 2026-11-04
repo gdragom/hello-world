@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LEDGER · Param lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f2ebe0;
+      --panel: #fffdf8;
+      --ink: #1c1914;
+      --muted: #6b6458;
+      --line: #ddd4c4;
+      --accent: #2a6f4e;
+      --long: #2a6f4e;
+      --short: #a33b2b;
+      --good: #1a7f4b;
+      --bad: #b42318;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 480px at 0% 0%, #e8f0e6 0%, transparent 55%),
+        radial-gradient(800px 420px at 100% 0%, #f0e6d8 0%, transparent 50%),
+        var(--bg);
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 2.5rem;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin: -1.25rem -1.25rem 1.1rem;
+      padding: 0.85rem 1.25rem 0.75rem;
+      background: color-mix(in srgb, var(--bg) 88%, #fff);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1.35rem;
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+    header p { display: none; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .side-toggle {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .side-toggle button {
+      border: 0;
+      background: transparent;
+      padding: 0.55rem 1.1rem;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .side-toggle button.active.long { background: var(--long); color: #fff; }
+    .side-toggle button.active.short { background: var(--short); color: #fff; }
+    .grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 0.9rem 1rem 1.1rem;
+    }
+    .panel h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .field { margin-bottom: 0.75rem; }
+    .field > label.top {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+    .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 0.45rem 0.5rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      font: inherit;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      border: 1px solid var(--line);
+      padding: 0.28rem 0.5rem;
+      font-size: 0.78rem;
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .chip input { accent-color: var(--accent); }
+    .chip.on { border-color: #8aa88f; background: #eef6f0; }
+    .checks { display: grid; gap: 0.35rem; }
+    .checks label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.86rem;
+      cursor: pointer;
+    }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .actions { display: none; }
+    button.primary, button.ghost {
+      border: 1px solid var(--line);
+      padding: 0.55rem 0.9rem;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    button.primary:disabled { opacity: 0.55; cursor: wait; }
+    button.primary.over {
+      background: #a33b2b;
+      border-color: #a33b2b;
+    }
+    button.ghost { background: #fff; }
+    .run-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      max-width: 22ch;
+      line-height: 1.25;
+    }
+    .run-hint.over { color: var(--short); font-weight: 600; }
+    .toast {
+      position: fixed;
+      bottom: 1.15rem;
+      right: 1.15rem;
+      z-index: 50;
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: #f7f2e9;
+      background: #1c1914;
+      padding: 0.42rem 0.7rem;
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .toast.show { opacity: 0.9; transform: translateY(0); }
+    .toast.err { background: #a33b2b; }
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+    @media (max-width: 700px) { .hero-metrics { grid-template-columns: repeat(2, 1fr); } }
+    .metric {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 0.65rem 0.7rem;
+    }
+    .metric span {
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .metric strong {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 1.15rem;
+      font-weight: 500;
+    }
+    .table-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; background: #fff; }
+    th, td { padding: 0.45rem 0.55rem; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { position: sticky; top: 0; background: #f7f2e9; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    tr:hover td { background: #faf7f1; }
+    tr.best td { background: #e7f4ea; }
+    tr.worst td { background: #f8e8e4; }
+    .place {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.08rem 0.35rem;
+      margin-right: 0.35rem;
+    }
+    .place.best { background: #2a6f4e; color: #fff; }
+    .place.worst { background: #a33b2b; color: #fff; }
+    .mono { font-family: "IBM Plex Mono", monospace; }
+    .win { color: var(--good); }
+    .loss { color: var(--bad); }
+    .note { font-size: 0.75rem; color: var(--muted); margin-top: 0.6rem; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Param lab</h1>
+      <div class="toolbar">
+        <div class="side-toggle" id="sideToggle">
+          <button type="button" class="active long" data-side="long">Long</button>
+          <button type="button" data-side="short">Short</button>
+        </div>
+        <button class="primary" id="btnRun" type="button">Run · 1</button>
+        <button class="ghost" id="btnPreset" type="button">Reset</button>
+        <span class="run-hint" id="runHint"></span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <aside class="panel" id="controls">
+        <h2>Window</h2>
+        <div class="field">
+          <label class="top">Lookback days</label>
+          <select id="days">
+            <option value="180">180</option>
+            <option value="365" selected>365</option>
+            <option value="730">730 (~2y)</option>
+          </select>
+        </div>
+
+        <h2>Structure</h2>
+        <div class="field">
+          <label class="top">Swing length <span class="hint">(multi = grid)</span></label>
+          <div class="chips" data-multi="swing_len">
+            <label class="chip"><input type="checkbox" value="6" /> 6</label>
+            <label class="chip on"><input type="checkbox" value="8" checked /> 8</label>
+            <label class="chip"><input type="checkbox" value="10" /> 10</label>
+            <label class="chip"><input type="checkbox" value="14" /> 14</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Min swing × ATR</label>
+          <div class="chips" data-multi="min_swing_atr">
+            <label class="chip"><input type="checkbox" value="0.45" /> 0.45</label>
+            <label class="chip on"><input type="checkbox" value="0.6" checked /> 0.6</label>
+            <label class="chip"><input type="checkbox" value="0.8" /> 0.8</label>
+            <label class="chip"><input type="checkbox" value="1.2" /> 1.2</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Fib timing</label>
+          <div class="chips" data-multi="fib_mode">
+            <label class="chip on"><input type="checkbox" value="immediate" checked /> Immediate</label>
+            <label class="chip"><input type="checkbox" value="wait" /> Wait post-swing</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Entry mode</label>
+          <div class="chips" data-multi="entry_mode">
+            <label class="chip on"><input type="checkbox" value="zone_fvg_ob" checked /> Zone+FVG/OB</label>
+            <label class="chip"><input type="checkbox" value="zone_only" /> Zone only</label>
+            <label class="chip"><input type="checkbox" value="deep" /> Deep / zone</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Daily bias</label>
+          <div class="chips" data-multi="bias_filter">
+            <label class="chip on"><input type="checkbox" value="aligned" checked /> Aligned</label>
+            <label class="chip"><input type="checkbox" value="block_opp" /> Block opposite</label>
+            <label class="chip"><input type="checkbox" value="off" /> Off</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">0.5 touch</label>
+          <div class="chips" data-multi="eq_wick">
+            <label class="chip on"><input type="checkbox" value="true" checked /> Wick</label>
+            <label class="chip"><input type="checkbox" value="false" /> Close</label>
+          </div>
+        </div>
+
+        <h2>Cooldown</h2>
+        <div class="row2">
+          <div class="field">
+            <label class="top">Cooldown</label>
+            <div class="chips" data-multi="cooldown">
+              <label class="chip"><input type="checkbox" value="0" /> 0</label>
+              <label class="chip"><input type="checkbox" value="2" /> 2</label>
+              <label class="chip on"><input type="checkbox" value="10" checked /> 10</label>
+            </div>
+          </div>
+          <div class="field">
+            <label class="top">Post-stop</label>
+            <div class="chips" data-multi="post_stop_cooldown">
+              <label class="chip"><input type="checkbox" value="0" /> 0</label>
+              <label class="chip"><input type="checkbox" value="2" /> 2</label>
+              <label class="chip on"><input type="checkbox" value="10" checked /> 10</label>
+            </div>
+          </div>
+        </div>
+
+        <h2>IFVG</h2>
+        <div class="field">
+          <label class="top">Require LTF IFVG</label>
+          <div class="chips" data-multi="require_ifvg">
+            <label class="chip on"><input type="checkbox" value="true" checked /> On</label>
+            <label class="chip"><input type="checkbox" value="false" /> Off</label>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label class="top">LTF</label>
+            <div class="chips" data-multi="ltf_tf">
+              <label class="chip on"><input type="checkbox" value="1" checked /> 1m</label>
+              <label class="chip"><input type="checkbox" value="5" /> 5m</label>
+            </div>
+          </div>
+          <div class="field">
+            <label class="top">IFVG max age <span class="hint">(LTF bars)</span></label>
+            <div class="chips" data-multi="ifvg_age">
+              <label class="chip"><input type="checkbox" value="4" /> 4</label>
+              <label class="chip"><input type="checkbox" value="6" /> 6</label>
+              <label class="chip"><input type="checkbox" value="8" /> 8</label>
+              <label class="chip on"><input type="checkbox" value="12" checked /> 12</label>
+              <label class="chip"><input type="checkbox" value="24" /> 24</label>
+            </div>
+          </div>
+        </div>
+
+        <h2>Exits (Fixed $ · TV)</h2>
+        <div class="field">
+          <label class="top">SL distance $</label>
+          <div class="chips" data-multi="fixed_usd_sl">
+            <label class="chip"><input type="checkbox" value="250" /> 250</label>
+            <label class="chip on"><input type="checkbox" value="500" checked /> 500</label>
+            <label class="chip"><input type="checkbox" value="750" /> 750</label>
+            <label class="chip"><input type="checkbox" value="1000" /> 1000</label>
+            <label class="chip"><input type="checkbox" value="1500" /> 1500</label>
+            <label class="chip"><input type="checkbox" value="2000" /> 2000</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Take profit $</label>
+          <div class="chips" data-multi="fixed_tp_usd">
+            <label class="chip"><input type="checkbox" value="500" /> 500</label>
+            <label class="chip on"><input type="checkbox" value="1000" checked /> 1000</label>
+            <label class="chip"><input type="checkbox" value="1500" /> 1500</label>
+            <label class="chip"><input type="checkbox" value="2000" /> 2000</label>
+            <label class="chip"><input type="checkbox" value="3000" /> 3000</label>
+            <label class="chip"><input type="checkbox" value="4000" /> 4000</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Risk $ / trade</label>
+          <div class="chips" data-multi="fixed_risk_usd">
+            <label class="chip"><input type="checkbox" value="250" /> 250</label>
+            <label class="chip on"><input type="checkbox" value="500" checked /> 500</label>
+            <label class="chip"><input type="checkbox" value="1000" /> 1000</label>
+          </div>
+        </div>
+
+        <h2>Gates</h2>
+        <div class="field">
+          <label class="top">BOS with candle body</label>
+          <div class="chips" data-multi="require_body">
+            <label class="chip on"><input type="checkbox" value="true" checked /> On</label>
+            <label class="chip"><input type="checkbox" value="false" /> Off</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Re-enter same Fib</label>
+          <div class="chips" data-multi="reenter">
+            <label class="chip on"><input type="checkbox" value="true" checked /> On</label>
+            <label class="chip"><input type="checkbox" value="false" /> Off</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="top">Lock Fib after stop</label>
+          <div class="chips" data-multi="lock_fib_on_stop">
+            <label class="chip"><input type="checkbox" value="true" /> On</label>
+            <label class="chip on"><input type="checkbox" value="false" checked /> Off</label>
+          </div>
+        </div>
+
+        <p class="note">Each extra tick multiplies rows (cooldown × LTF × age × SL × TP…). Cap 216 — uncheck extras to compare one axis at a time.</p>
+      </aside>
+
+      <main>
+        <div class="hero-metrics" id="hero">
+          <div class="metric"><span>Trades</span><strong>—</strong></div>
+          <div class="metric"><span>WR</span><strong>—</strong></div>
+          <div class="metric"><span>PF</span><strong>—</strong></div>
+          <div class="metric"><span>PnL %</span><strong>—</strong></div>
+          <div class="metric"><span>Max DD %</span><strong>—</strong></div>
+        </div>
+        <div class="panel" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-k="rank">#</th>
+                  <th data-k="tag">Combo</th>
+                  <th data-k="trades">n</th>
+                  <th data-k="wr">WR%</th>
+                  <th data-k="pf">PF</th>
+                  <th data-k="pnl_pct">PnL%</th>
+                  <th data-k="max_dd_pct">DD%</th>
+                  <th data-k="score">Score</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    let side = "long";
+    let rows = [];
+    let sortKey = "score";
+    let sortDir = -1;
+
+    const $ = (id) => document.getElementById(id);
+
+    function chipValues(name) {
+      const root = document.querySelector(`[data-multi="${name}"]`);
+      const vals = [...root.querySelectorAll("input:checked")].map((el) => el.value);
+      if (["eq_wick", "require_ifvg", "require_body", "reenter", "lock_fib_on_stop"].includes(name)) {
+        return vals.map((v) => v === "true");
+      }
+      if (["swing_len", "cooldown", "post_stop_cooldown", "ifvg_age", "fixed_usd_sl", "fixed_tp_usd", "fixed_risk_usd"].includes(name)) {
+        return vals.map(Number);
+      }
+      if (name === "min_swing_atr") return vals.map(Number);
+      return vals;
+    }
+
+    function chipOr(name, fallback) {
+      const v = chipValues(name);
+      return v.length ? v : [fallback];
+    }
+
+    function syncChipStyles() {
+      document.querySelectorAll(".chip").forEach((c) => {
+        const on = c.querySelector("input").checked;
+        c.classList.toggle("on", on);
+      });
+    }
+    document.querySelectorAll(".chip input").forEach((el) => {
+      el.addEventListener("change", () => {
+        syncChipStyles();
+        updateRunLabel();
+      });
+    });
+
+    function applySideDefaults() {
+      const on = (name, vals) => {
+        document.querySelectorAll(`[data-multi="${name}"] input`).forEach((el) => {
+          el.checked = vals.includes(el.value);
+        });
+      };
+      if (side === "long") {
+        on("fixed_usd_sl", ["500"]);
+        on("fixed_tp_usd", ["1000"]);
+      } else {
+        on("fixed_usd_sl", ["1000"]);
+        on("fixed_tp_usd", ["2000"]);
+      }
+      on("fixed_risk_usd", ["500"]);
+      syncChipStyles();
+    }
+
+    document.querySelectorAll("#sideToggle button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        side = btn.dataset.side;
+        document.querySelectorAll("#sideToggle button").forEach((b) => {
+          b.classList.remove("active", "long", "short");
+          if (b.dataset.side === side) b.classList.add("active", side);
+        });
+        applySideDefaults();
+        updateRunLabel();
+      });
+    });
+
+    function gridBody() {
+      return {
+        side,
+        days: Number($("days").value),
+        swing_len: chipOr("swing_len", 8),
+        min_swing_atr: chipOr("min_swing_atr", 0.6),
+        fib_mode: chipOr("fib_mode", "immediate"),
+        entry_mode: chipOr("entry_mode", "zone_fvg_ob"),
+        bias_filter: chipOr("bias_filter", "aligned"),
+        eq_wick: chipOr("eq_wick", true),
+        cooldown: chipOr("cooldown", 10),
+        post_stop_cooldown: chipOr("post_stop_cooldown", 10),
+        require_ifvg: chipOr("require_ifvg", true),
+        require_body: chipOr("require_body", true),
+        reenter: chipOr("reenter", true),
+        lock_fib_on_stop: chipOr("lock_fib_on_stop", false),
+        ltf_tf: chipOr("ltf_tf", "1"),
+        ifvg_age: chipOr("ifvg_age", 12),
+        fixed_usd_sl: chipOr("fixed_usd_sl", side === "long" ? 500 : 1000),
+        fixed_tp_usd: chipOr("fixed_tp_usd", side === "long" ? 1000 : 2000),
+        fixed_risk_usd: chipOr("fixed_risk_usd", 500),
+      };
+    }
+
+    const MAX_COMBOS = 216;
+
+    function comboCount(body) {
+      return Object.values(body)
+        .filter(Array.isArray)
+        .reduce((n, arr) => n * Math.max(arr.length, 1), 1);
+    }
+
+    function updateRunLabel() {
+      const n = comboCount(gridBody());
+      const over = n > MAX_COMBOS;
+      const btn = $("btnRun");
+      const hint = $("runHint");
+      if (!btn.disabled) btn.textContent = over ? `Too many · ${n.toLocaleString()}` : `Run · ${n}`;
+      btn.classList.toggle("over", over);
+      hint.textContent = over ? `Uncheck some (max ${MAX_COMBOS})` : "";
+      hint.classList.toggle("over", over);
+      return n;
+    }
+
+    function setHero(m) {
+      const cells = [
+        m.trades,
+        m.wr.toFixed(1) + "%",
+        m.pf.toFixed(3),
+        (m.pnl_pct >= 0 ? "+" : "") + m.pnl_pct.toFixed(1) + "%",
+        m.max_dd_pct.toFixed(1) + "%",
+      ];
+      const el = $("hero");
+      el.innerHTML = ["Trades", "WR", "PF", "PnL %", "Max DD %"]
+        .map((lab, i) => {
+          let cls = "";
+          if (lab === "PnL %") cls = m.pnl_pct >= 0 ? "win" : "loss";
+          return `<div class="metric"><span>${lab}</span><strong class="${cls}">${cells[i]}</strong></div>`;
+        })
+        .join("");
+    }
+
+    function renderTable() {
+      const sorted = [...rows].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        if (av === bv) return 0;
+        return av > bv ? sortDir : -sortDir;
+      });
+      $("tbody").innerHTML = sorted
+        .map((r) => {
+          const pnlCls = r.pnl_pct >= 0 ? "win" : "loss";
+          const place = r.place === "best" || r.place === "worst" ? r.place : "";
+          const badge = place ? `<span class="place ${place}">${place}</span>` : "";
+          const rank = r.rank != null ? r.rank : "";
+          const scoreTxt = r.score <= -1e8 ? "fail*" : r.score.toFixed(1);
+          return `<tr class="${place}">
+            <td class="mono">${rank}</td>
+            <td>${badge}${r.tag || "run"}</td>
+            <td class="mono">${r.trades}</td>
+            <td class="mono">${r.wr.toFixed(1)}</td>
+            <td class="mono">${r.pf.toFixed(3)}</td>
+            <td class="mono ${pnlCls}">${r.pnl_pct.toFixed(1)}</td>
+            <td class="mono">${r.max_dd_pct.toFixed(1)}</td>
+            <td class="mono">${scoreTxt}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    document.querySelectorAll("th[data-k]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const k = th.dataset.k;
+        if (sortKey === k) sortDir *= -1;
+        else { sortKey = k; sortDir = -1; }
+        renderTable();
+      });
+    });
+
+    async function post(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return res.json();
+    }
+
+    let toastTimer;
+    function ping(msg, isErr) {
+      const el = $("toast");
+      el.textContent = msg;
+      el.classList.toggle("err", !!isErr);
+      el.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove("show"), isErr ? 4200 : 2000);
+    }
+
+    $("btnRun").addEventListener("click", async () => {
+      const btn = $("btnRun");
+      const body = gridBody();
+      const n = comboCount(body);
+      if (n > MAX_COMBOS) {
+        ping(`${n.toLocaleString()} combos — uncheck extras (max ${MAX_COMBOS})`, true);
+        updateRunLabel();
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = n > 1 ? `${n}…` : "…";
+      try {
+        const data = await post("/api/grid", body);
+        if (!data.ok) throw new Error(data.error || "failed");
+        rows = data.rows;
+        if (rows.length) setHero(rows[0]);
+        renderTable();
+        ping(`Done · ${data.combos} row${data.combos === 1 ? "" : "s"}`);
+      } catch (e) {
+        ping(String(e.message || e), true);
+      } finally {
+        btn.disabled = false;
+        updateRunLabel();
+      }
+    });
+
+    $("btnPreset").addEventListener("click", () => {
+      document.querySelectorAll("[data-multi] input").forEach((el) => { el.checked = false; });
+      const on = (name, vals) => {
+        document.querySelectorAll(`[data-multi="${name}"] input`).forEach((el) => {
+          el.checked = vals.includes(el.value);
+        });
+      };
+      on("swing_len", ["8"]);
+      on("min_swing_atr", ["0.6"]);
+      on("fib_mode", ["immediate"]);
+      on("entry_mode", ["zone_fvg_ob"]);
+      on("bias_filter", ["aligned"]);
+      on("eq_wick", ["true"]);
+      on("cooldown", ["10"]);
+      on("post_stop_cooldown", ["10"]);
+      on("require_ifvg", ["true"]);
+      on("require_body", ["true"]);
+      on("reenter", ["true"]);
+      on("lock_fib_on_stop", ["false"]);
+      on("ltf_tf", ["1"]);
+      on("ifvg_age", ["12"]);
+      $("days").value = "365";
+      applySideDefaults();
+      syncChipStyles();
+      updateRunLabel();
+      ping("Reset");
+    });
+
+    syncChipStyles();
+    applySideDefaults();
+    updateRunLabel();
+  </script>
+</body>
+</html>

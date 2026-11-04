@@ -1,0 +1,4 @@
+# LEDGER optimizer (local grid / walk-forward)
+pandas>=2.0
+numpy>=1.24
+ccxt>=4.0
