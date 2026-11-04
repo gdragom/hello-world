@@ -1,0 +1,852 @@
+//@version=5
+// LEDGER ICT 1H v0.5.6
+// Flow:
+//  0) Daily bias from LAST COMPLETED daily (aggregate 1H via timeframe.change("D"))
+//  1) SH/SL pending level → stops on body break (MSS/BOS); never extend past break
+//  2) Fib after BOS → yellow 0.5
+//  3) ENT = zone + virgin FVG/OB (capped pools; fast path for TV timeout)
+// Note: Pine forbids := on globals inside functions — kill/reset stays in main body.
+
+indicator("LEDGER ICT 1H v0.5.6", overlay=true, max_boxes_count=50, max_lines_count=100, max_labels_count=150)
+
+grpBias = "Daily bias"
+dojiBodyPct = input.float(10.0, "Doji body ≤ % of range", minval=1.0, maxval=30.0, step=0.5, group=grpBias,
+     tooltip="|C-O| / (H-L) ≤ this % → doji. Default 10.")
+
+grpSw = "Structure"
+swingLen = input.int(14, "Swing pivot length", minval=5, maxval=30, group=grpSw,
+     tooltip="Bigger = fewer/larger swings. 12–18 for 1H discretionary feel.")
+minSwingAtr = input.float(1.2, "Min swing size (× ATR)", minval=0.0, step=0.1, group=grpSw,
+     tooltip="Ignore tiny pivots. 0 = off. 1.0–1.5 filters micro swings on 1H.")
+atrLen = input.int(14, "ATR length", minval=5, maxval=50, group=grpSw)
+requireBody = input.bool(true, "BOS/MSS with candle BODY", group=grpSw)
+
+grpEnt = "1H entry (discount)"
+useFvg = input.bool(true, "Require / use FVG in ≤0.5", group=grpEnt)
+useOb = input.bool(true, "Require / use OB in ≤0.5", group=grpEnt)
+zoneKeep = input.int(50, "Keep virgin FVG/OB (bars)", minval=20, maxval=120, group=grpEnt,
+     tooltip="Expire untouched zones older than this. Lower = faster.")
+obLookback = input.int(20, "OB lookback (unused in v0.5.1)", minval=5, maxval=50, group=grpEnt,
+     tooltip="Kept for compatibility; OB now uses prior-bar displacement only.")
+needEither = input.bool(true, "FVG OR OB (off = both)", group=grpEnt)
+
+grpVis = "Display"
+cleanMode = input.bool(true, "Clean mode", group=grpVis)
+showSwings = input.bool(true, "Show swing marks", group=grpVis)
+showFibExtremes = input.bool(false, "Show Fib 0 & 1 lines", group=grpVis,
+     tooltip="Off by default. Yellow 0.5 = IRL. Green/red extremes clutter the chart.")
+irlBars = input.int(60, "Keep fib/IRL (bars)", minval=20, group=grpVis)
+highlightNow = input.bool(true, "NOW badge", group=grpVis)
+
+grpAlert = "LEDGER webhook"
+alertSecret = input.string("ledger-local-test-secret-7kQp2mN9", "TV_WEBHOOK_SECRET", group=grpAlert)
+symbolOverride = input.string("", "Symbol override", group=grpAlert)
+alertOnBos = input.bool(false, "Also alert on BOS (structure only)", group=grpAlert)
+
+// ── Daily bias: build D from this chart's 1H bars; seal only on day change ──
+// Matches TV Daily pane for same symbol (crypto D ≈ UTC 00:00 = HKT 08:00).
+// Forming day stays in cur*; bias reads sealed y* (yesterday) vs b* (day before).
+var float curO = na
+var float curH = na
+var float curL = na
+var float curC = na
+var float yO = na
+var float yH = na
+var float yL = na
+var float yC = na
+var float bH = na
+var float bL = na
+
+newDay = timeframe.change("D")
+if newDay
+    // First bar of new day: cur* still holds the completed previous day
+    bH := yH
+    bL := yL
+    yO := curO
+    yH := curH
+    yL := curL
+    yC := curC
+    curO := open
+    curH := high
+    curL := low
+    curC := close
+else
+    if na(curO)
+        curO := open
+        curH := high
+        curL := low
+        curC := close
+    else
+        curH := math.max(curH, high)
+        curL := math.min(curL, low)
+        curC := close
+
+dO1 = yO
+dH1 = yH
+dL1 = yL
+dC1 = yC
+dH2 = bH
+dL2 = bL
+
+dRange1 = dH1 - dL1
+isDojiD = not na(dO1) and not na(dC1) and dRange1 > 0 and (math.abs(dC1 - dO1) / dRange1 * 100.0) <= dojiBodyPct
+isBullD = not na(dO1) and not na(dC1) and dC1 > dO1
+isBearD = not na(dO1) and not na(dC1) and dC1 < dO1
+
+// B: PDL/PDH of day-before-yesterday swept by yesterday, close back across that level
+pdlSweep = not na(dL1) and not na(dL2) and not na(dC1) and dL1 < dL2 and dC1 > dL2
+pdhSweep = not na(dH1) and not na(dH2) and not na(dC1) and dH1 > dH2 and dC1 < dH2
+
+// biasDir: 1 long, -1 short, 0 uncertain
+// biasQ: 2 sweep-confirmed, 1 color-only, 0 uncertain/doji
+biasDir = 0
+biasQ = 0
+biasTxt = "UNCERTAIN"
+
+if na(dC1) or na(dL2)
+    biasDir := 0
+    biasQ := 0
+    biasTxt := "BIAS n/a"
+else if pdlSweep and pdhSweep
+    biasDir := 0
+    biasQ := 0
+    biasTxt := "UNCERTAIN (dual)"
+else if pdlSweep
+    // PDL sweep: green = LONG confirmed; red = UNCERTAIN
+    if isDojiD
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN (PDL doji)"
+    else if isBullD
+        biasDir := 1
+        biasQ := 2
+        biasTxt := "LONG (PDL sweep)"
+    else
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN (PDL+red)"
+else if pdhSweep
+    // PDH sweep mirror: red = SHORT confirmed; green = UNCERTAIN
+    if isDojiD
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN (PDH doji)"
+    else if isBearD
+        biasDir := -1
+        biasQ := 2
+        biasTxt := "SHORT (PDH sweep)"
+    else
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN (PDH+green)"
+else
+    if isDojiD
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN (doji)"
+    else if isBullD
+        biasDir := 1
+        biasQ := 1
+        biasTxt := "LONG (prior green)"
+    else if isBearD
+        biasDir := -1
+        biasQ := 1
+        biasTxt := "SHORT (prior red)"
+    else
+        biasDir := 0
+        biasQ := 0
+        biasTxt := "UNCERTAIN"
+
+// Confidence 0–100 for an ENT print (indication only — never blocks)
+f_entry_conf(isLong, hitFvg, hitOb) =>
+    score = 45
+    if hitFvg
+        score += 15
+    if hitOb
+        score += 15
+    align = isLong ? biasDir == 1 : biasDir == -1
+    opposite = isLong ? biasDir == -1 : biasDir == 1
+    if align and biasQ == 2
+        score += 25
+    else if align and biasQ == 1
+        score += 15
+    else if opposite
+        score -= 25
+    else
+        score -= 12
+    if isDojiD
+        score -= 8
+    math.max(0, math.min(100, score))
+
+f_conf_tag(score) =>
+    score >= 75 ? "HIGH" : score >= 55 ? "MID" : "LOW"
+
+atr = ta.atr(atrLen)
+minSwingDist = minSwingAtr <= 0 ? 0.0 : atr * minSwingAtr
+
+// ── Swings (size-filtered) ──────────────────────────────────────────
+rawPh = ta.pivothigh(high, swingLen, swingLen)
+rawPl = ta.pivotlow(low, swingLen, swingLen)
+
+var float lastSH = na
+var float lastSL = na
+var int   lastShBar = na
+var int   lastSlBar = na
+var int   lastBreakSide = 0
+
+// Pending SH/SL rays: grow until body break, then hard-stop (no extend.right)
+var line  pendShLn = na
+var line  pendSlLn = na
+var bool  pendShLive = false
+var bool  pendSlLive = false
+
+ph = float(na)
+pl = float(na)
+
+if not na(rawPh)
+    acceptSh = minSwingDist <= 0 or na(lastSL) or (rawPh - lastSL) >= minSwingDist
+    if acceptSh
+        ph := rawPh
+        lastSH := rawPh
+        lastShBar := bar_index - swingLen
+        if not na(pendShLn)
+            line.delete(pendShLn)
+        pendShLn := line.new(lastShBar, lastSH, bar_index, lastSH,
+             color=color.new(#e8a838, 0), style=line.style_dotted, width=1, extend=extend.none)
+        pendShLive := true
+
+if not na(rawPl)
+    acceptSl = minSwingDist <= 0 or na(lastSH) or (lastSH - rawPl) >= minSwingDist
+    if acceptSl
+        pl := rawPl
+        lastSL := rawPl
+        lastSlBar := bar_index - swingLen
+        if not na(pendSlLn)
+            line.delete(pendSlLn)
+        pendSlLn := line.new(lastSlBar, lastSL, bar_index, lastSL,
+             color=color.new(#3dba7e, 0), style=line.style_dotted, width=1, extend=extend.none)
+        pendSlLive := true
+
+plotshape(showSwings and not na(ph), title="SH", style=shape.triangledown, location=location.abovebar,
+     color=color.new(#e8a838, 20), size=size.tiny, offset=-swingLen)
+plotshape(showSwings and not na(pl), title="SL", style=shape.triangleup, location=location.belowbar,
+     color=color.new(#3dba7e, 20), size=size.tiny, offset=-swingLen)
+
+// ── Bull state ──────────────────────────────────────────────────────
+var bool  bBos = false
+var int   bBosBar = na
+var float bLevel = na
+var float bPriorSL = na
+var bool  bFibOn = false
+var float bFibHi = na
+var float bFibLo = na
+var float bEq = na
+var int   bFibBar = na
+var bool  bEntered = false
+var bool  bIsMss = false
+var box   bIrl = na
+var box   bFvgBox = na
+var box   bObBox = na
+var line  bBosLine = na
+var label bSwingLbl = na
+var label bBreakLbl = na
+var label bFibLbl = na
+
+// ── Bear state ──────────────────────────────────────────────────────
+var bool  sBos = false
+var int   sBosBar = na
+var float sLevel = na
+var float sPriorSH = na
+var bool  sFibOn = false
+var float sFibHi = na
+var float sFibLo = na
+var float sEq = na
+var int   sFibBar = na
+var bool  sEntered = false
+var bool  sIsMss = false
+var box   sIrl = na
+var box   sFvgBox = na
+var box   sObBox = na
+var line  sBosLine = na
+var label sSwingLbl = na
+var label sBreakLbl = na
+var label sFibLbl = na
+
+var label nowBadge = na
+var label[] entLHist = array.new_label()
+var label[] entSHist = array.new_label()
+maxEntHist = 30
+
+f_push_ent(hist, lbl) =>
+    array.push(hist, lbl)
+    if array.size(hist) > maxEntHist
+        old = array.shift(hist)
+        if not na(old)
+            label.delete(old)
+
+// Helpers may only delete / mutate drawing objects passed in — never := globals
+f_del_box(b) =>
+    if not na(b)
+        box.delete(b)
+
+f_del_lab(l) =>
+    if not na(l)
+        label.delete(l)
+
+// Retire structure: dotted only — never stretch x2 past the break bar
+f_retire_struct(ln) =>
+    if not na(ln)
+        line.set_style(ln, line.style_dotted)
+        line.set_extend(ln, extend.none)
+        line.set_width(ln, 1)
+
+// Snap pending SH/SL ray to this bar (end of level). Returns false if no live line.
+f_snap_pending(ln, live) =>
+    ok = live and not na(ln)
+    if ok
+        line.set_x2(ln, bar_index)
+        line.set_extend(ln, extend.none)
+    ok
+
+// Promote snapped pending → live BOS/MSS look + tags
+f_promote_struct(ln, swingBar, lvl, breakBar, isBull, isMss) =>
+    col = isBull ? color.new(#3dba7e, 0) : color.new(#d4543c, 0)
+    tag = isMss ? (isBull ? "MSS ↑" : "MSS ↓") : (isBull ? "BOS ↑" : "BOS ↓")
+    if not na(ln)
+        line.set_color(ln, col)
+        line.set_style(ln, line.style_solid)
+        line.set_width(ln, 2)
+        line.set_extend(ln, extend.none)
+        line.set_x2(ln, breakBar)
+    x1 = na(swingBar) ? breakBar - 1 : swingBar
+    swingTag = isBull ? "SH" : "SL"
+    swingLbl = label.new(x1, lvl, swingTag,
+         style=isBull ? label.style_label_down : label.style_label_up,
+         color=color.new(col, 25), textcolor=color.white, size=size.normal)
+    breakY = isBull ? math.max(high, lvl) : math.min(low, lvl)
+    breakLbl = label.new(breakBar, breakY, tag,
+         style=isBull ? label.style_label_down : label.style_label_up,
+         color=color.new(col, 10), textcolor=color.white, size=size.normal)
+    [swingLbl, breakLbl]
+
+// Fallback if pending line missing (e.g. mid-load): fixed swing→break segment
+f_new_struct_line(swingBar, lvl, breakBar, isBull, isMss) =>
+    col = isBull ? color.new(#3dba7e, 0) : color.new(#d4543c, 0)
+    tag = isMss ? (isBull ? "MSS ↑" : "MSS ↓") : (isBull ? "BOS ↑" : "BOS ↓")
+    x1 = na(swingBar) ? breakBar - 1 : swingBar
+    ln = line.new(x1, lvl, breakBar, lvl,
+         color=col, style=line.style_solid, width=2, extend=extend.none)
+    swingTag = isBull ? "SH" : "SL"
+    swingLbl = label.new(x1, lvl, swingTag,
+         style=isBull ? label.style_label_down : label.style_label_up,
+         color=color.new(col, 25), textcolor=color.white, size=size.normal)
+    breakY = isBull ? math.max(high, lvl) : math.min(low, lvl)
+    breakLbl = label.new(breakBar, breakY, tag,
+         style=isBull ? label.style_label_down : label.style_label_up,
+         color=color.new(col, 10), textcolor=color.white, size=size.normal)
+    [ln, swingLbl, breakLbl]
+
+killBull = (bFibOn and not na(bFibBar) and bar_index - bFibBar > irlBars) or (bFibOn and not na(bFibLo) and close < bFibLo) or (bBos and not bFibOn and not na(bLevel) and close < bLevel)
+killBear = (sFibOn and not na(sFibBar) and bar_index - sFibBar > irlBars) or (sFibOn and not na(sFibHi) and close > sFibHi) or (sBos and not sFibOn and not na(sLevel) and close > sLevel)
+
+if killBull
+    f_retire_struct(bBosLine)
+    bBosLine := na
+    bBos := false
+    bFibOn := false
+    bEntered := false
+    bFibHi := na
+    bFibLo := na
+    bEq := na
+    f_del_box(bIrl)
+    f_del_box(bFvgBox)
+    f_del_box(bObBox)
+    f_del_lab(bFibLbl)
+    bIrl := na
+    bFvgBox := na
+    bObBox := na
+    bFibLbl := na
+    // keep ENT L history labels
+    // keep bSwingLbl / bBreakLbl on chart (history)
+
+if killBear
+    f_retire_struct(sBosLine)
+    sBosLine := na
+    sBos := false
+    sFibOn := false
+    sEntered := false
+    sFibHi := na
+    sFibLo := na
+    sEq := na
+    f_del_box(sIrl)
+    f_del_box(sFvgBox)
+    f_del_box(sObBox)
+    f_del_lab(sFibLbl)
+    sIrl := na
+    sFvgBox := na
+    sObBox := na
+    sFibLbl := na
+    // keep ENT S history labels
+    // keep sSwingLbl / sBreakLbl on chart (history)
+
+// ── 1) Bull BOS/MSS — pending SH ray ends on body break ─────────────
+bullBodyTop = math.max(open, close)
+bullBreak = not na(lastSH) and close > lastSH and (not requireBody or bullBodyTop > lastSH)
+bullBosNow = false
+
+if bullBreak and pendShLive
+    f_snap_pending(pendShLn, true)
+    pendShLive := false
+
+if bullBreak and not bBos and not bFibOn
+    // kill opposite bear (inline)
+    f_retire_struct(sBosLine)
+    sBosLine := na
+    sBos := false
+    sFibOn := false
+    sEntered := false
+    sFibHi := na
+    sFibLo := na
+    sEq := na
+    f_del_box(sIrl)
+    f_del_box(sFvgBox)
+    f_del_box(sObBox)
+    f_del_lab(sFibLbl)
+    sIrl := na
+    sFvgBox := na
+    sObBox := na
+    sFibLbl := na
+
+    bIsMss := lastBreakSide == -1
+    lastBreakSide := 1
+    bBos := true
+    bBosBar := bar_index
+    bLevel := lastSH
+    bPriorSL := lastSL
+    bFibOn := false
+    bEntered := false
+    bFibHi := na
+    bFibLo := na
+    bEq := na
+    f_del_box(bIrl)
+    f_del_box(bFvgBox)
+    f_del_box(bObBox)
+    f_del_lab(bFibLbl)
+    bIrl := na
+    bFvgBox := na
+    bObBox := na
+    bFibLbl := na
+    f_retire_struct(bBosLine)
+    f_del_lab(bSwingLbl)
+    f_del_lab(bBreakLbl)
+    if not na(pendShLn)
+        [bSw, bBr] = f_promote_struct(pendShLn, lastShBar, lastSH, bar_index, true, bIsMss)
+        bBosLine := pendShLn
+        bSwingLbl := bSw
+        bBreakLbl := bBr
+        pendShLn := na
+    else
+        [bLn, bSw, bBr] = f_new_struct_line(lastShBar, lastSH, bar_index, true, bIsMss)
+        bBosLine := bLn
+        bSwingLbl := bSw
+        bBreakLbl := bBr
+    bullBosNow := true
+else if bullBreak and not na(pendShLn)
+    // Broke SH while another plan is active — stop ray, keep short stub
+    line.set_color(pendShLn, color.new(#3dba7e, 55))
+    line.set_style(pendShLn, line.style_dotted)
+    line.set_width(pendShLn, 1)
+    line.set_extend(pendShLn, extend.none)
+    line.set_x2(pendShLn, bar_index)
+    pendShLn := na
+    pendShLive := false
+
+// ── 2) After BOS: new swing high → fib to prior SL ──────────────────
+bullFibNow = false
+if bBos and not bFibOn and not na(ph)
+    shBar = bar_index - swingLen
+    if not na(bBosBar) and shBar > bBosBar
+        fibLo = not na(lastSL) ? lastSL : bPriorSL
+        if not na(fibLo) and ph > fibLo
+            bFibHi := ph
+            bFibLo := fibLo
+            bEq := bFibLo + (bFibHi - bFibLo) * 0.5
+            bFibOn := true
+            bFibBar := bar_index
+            bEntered := false
+            bBos := false
+            f_retire_struct(bBosLine)
+            bBosLine := na
+            // FIB IRL zone — bold dashed gold border so it stands out from FVG/OB
+            bIrl := box.new(bar_index - swingLen, bEq, bar_index + irlBars, bFibLo,
+                 bgcolor=color.new(#1faa6e, 72), border_color=color.new(#f0c040, 0), border_width=3,
+                 border_style=line.style_dashed)
+            bFibLbl := label.new(bar_index - swingLen, bEq, "FIB ≤0.5 IRL",
+                 style=label.style_label_down, color=color.new(#f0c040, 0), textcolor=color.black, size=size.normal)
+            bullFibNow := true
+
+// ── Bear BOS/MSS — pending SL ray ends on body break ────────────────
+bearBodyBot = math.min(open, close)
+bearBreak = not na(lastSL) and close < lastSL and (not requireBody or bearBodyBot < lastSL)
+bearBosNow = false
+
+if bearBreak and pendSlLive
+    f_snap_pending(pendSlLn, true)
+    pendSlLive := false
+
+if bearBreak and not sBos and not sFibOn
+    f_retire_struct(bBosLine)
+    bBosLine := na
+    bBos := false
+    bFibOn := false
+    bEntered := false
+    bFibHi := na
+    bFibLo := na
+    bEq := na
+    f_del_box(bIrl)
+    f_del_box(bFvgBox)
+    f_del_box(bObBox)
+    f_del_lab(bFibLbl)
+    bIrl := na
+    bFvgBox := na
+    bObBox := na
+    bFibLbl := na
+
+    sIsMss := lastBreakSide == 1
+    lastBreakSide := -1
+    sBos := true
+    sBosBar := bar_index
+    sLevel := lastSL
+    sPriorSH := lastSH
+    sFibOn := false
+    sEntered := false
+    sFibHi := na
+    sFibLo := na
+    sEq := na
+    f_del_box(sIrl)
+    f_del_box(sFvgBox)
+    f_del_box(sObBox)
+    f_del_lab(sFibLbl)
+    sIrl := na
+    sFvgBox := na
+    sObBox := na
+    sFibLbl := na
+    f_retire_struct(sBosLine)
+    f_del_lab(sSwingLbl)
+    f_del_lab(sBreakLbl)
+    if not na(pendSlLn)
+        [sSw, sBr] = f_promote_struct(pendSlLn, lastSlBar, lastSL, bar_index, false, sIsMss)
+        sBosLine := pendSlLn
+        sSwingLbl := sSw
+        sBreakLbl := sBr
+        pendSlLn := na
+    else
+        [sLn, sSw, sBr] = f_new_struct_line(lastSlBar, lastSL, bar_index, false, sIsMss)
+        sBosLine := sLn
+        sSwingLbl := sSw
+        sBreakLbl := sBr
+    bearBosNow := true
+else if bearBreak and not na(pendSlLn)
+    line.set_color(pendSlLn, color.new(#d4543c, 55))
+    line.set_style(pendSlLn, line.style_dotted)
+    line.set_width(pendSlLn, 1)
+    line.set_extend(pendSlLn, extend.none)
+    line.set_x2(pendSlLn, bar_index)
+    pendSlLn := na
+    pendSlLive := false
+
+bearFibNow = false
+if sBos and not sFibOn and not na(pl)
+    slBar = bar_index - swingLen
+    if not na(sBosBar) and slBar > sBosBar
+        fibHi = not na(lastSH) ? lastSH : sPriorSH
+        if not na(fibHi) and fibHi > pl
+            sFibHi := fibHi
+            sFibLo := pl
+            sEq := sFibHi - (sFibHi - sFibLo) * 0.5
+            sFibOn := true
+            sFibBar := bar_index
+            sEntered := false
+            sBos := false
+            f_retire_struct(sBosLine)
+            sBosLine := na
+            sIrl := box.new(bar_index - swingLen, sFibHi, bar_index + irlBars, sEq,
+                 bgcolor=color.new(#d4543c, 72), border_color=color.new(#f0c040, 0), border_width=3,
+                 border_style=line.style_dashed)
+            sFibLbl := label.new(bar_index - swingLen, sEq, "FIB ≥0.5 IRL",
+                 style=label.style_label_up, color=color.new(#f0c040, 0), textcolor=color.black, size=size.normal)
+            bearFibNow := true
+
+// Grow pending rays only while still unbroken (never past MSS/BOS bar)
+if pendShLive and not na(pendShLn)
+    line.set_x2(pendShLn, bar_index)
+    line.set_extend(pendShLn, extend.none)
+if pendSlLive and not na(pendSlLn)
+    line.set_x2(pendSlLn, bar_index)
+    line.set_extend(pendSlLn, extend.none)
+
+plot(bFibOn ? bEq : na, "Bull 0.5 (IRL)", color=color.new(#f0c040, 0), linewidth=3)
+plot(sFibOn ? sEq : na, "Bear 0.5 (IRL)", color=color.new(#f0c040, 0), linewidth=3)
+plot(showFibExtremes and bFibOn ? bFibHi : na, "Bull Fib 1", color=color.new(#3dba7e, 50), linewidth=1)
+plot(showFibExtremes and bFibOn ? bFibLo : na, "Bull Fib 0", color=color.new(#3dba7e, 50), linewidth=1)
+plot(showFibExtremes and sFibOn ? sFibHi : na, "Bear Fib 1", color=color.new(#d4543c, 50), linewidth=1)
+plot(showFibExtremes and sFibOn ? sFibLo : na, "Bear Fib 0", color=color.new(#d4543c, 50), linewidth=1)
+
+// ── Virgin FVG / OB (capped pools — avoids TV 40s timeout) ──
+maxZones = 8
+
+var float[] bfTop = array.new_float()
+var float[] bfBot = array.new_float()
+var int[]   bfBar = array.new_int()
+var bool[]  bfLive = array.new_bool()
+var box[]   bfBox = array.new_box()
+
+var float[] sfTop = array.new_float()
+var float[] sfBot = array.new_float()
+var int[]   sfBar = array.new_int()
+var bool[]  sfLive = array.new_bool()
+var box[]   sfBox = array.new_box()
+
+var float[] boTop = array.new_float()
+var float[] boBot = array.new_float()
+var int[]   boBar = array.new_int()
+var bool[]  boLive = array.new_bool()
+var box[]   boBox = array.new_box()
+
+var float[] soTop = array.new_float()
+var float[] soBot = array.new_float()
+var int[]   soBar = array.new_int()
+var bool[]  soLive = array.new_bool()
+var box[]   soBox = array.new_box()
+
+f_shift_zone(tops, bots, bars, lives, boxes) =>
+    bx0 = array.get(boxes, 0)
+    if not na(bx0)
+        box.delete(bx0)
+    array.shift(tops)
+    array.shift(bots)
+    array.shift(bars)
+    array.shift(lives)
+    array.shift(boxes)
+
+f_kill_zone(lives, boxes, idx) =>
+    array.set(lives, idx, false)
+    bx = array.get(boxes, idx)
+    if not na(bx)
+        box.set_bgcolor(bx, color.new(color.gray, 92))
+        box.set_border_color(bx, color.new(color.gray, 75))
+        box.set_right(bx, bar_index)
+
+bullFvgNow = high[2] < low[0]
+bearFvgNow = low[2] > high[0]
+
+if useFvg and bullFvgNow and low[0] > high[2]
+    if array.size(bfTop) >= maxZones
+        f_shift_zone(bfTop, bfBot, bfBar, bfLive, bfBox)
+    array.push(bfTop, low[0])
+    array.push(bfBot, high[2])
+    array.push(bfBar, bar_index)
+    array.push(bfLive, true)
+    array.push(bfBox, box.new(bar_index - 2, low[0], bar_index + 2, high[2], bgcolor=color.new(#3dba7e, 92), border_color=color.new(#3dba7e, 70), border_width=1, border_style=line.style_dotted))
+
+if useFvg and bearFvgNow and low[2] > high[0]
+    if array.size(sfTop) >= maxZones
+        f_shift_zone(sfTop, sfBot, sfBar, sfLive, sfBox)
+    array.push(sfTop, low[2])
+    array.push(sfBot, high[0])
+    array.push(sfBar, bar_index)
+    array.push(sfLive, true)
+    array.push(sfBox, box.new(bar_index - 2, low[2], bar_index + 2, high[0], bgcolor=color.new(#d4543c, 92), border_color=color.new(#d4543c, 70), border_width=1, border_style=line.style_dotted))
+
+// Textbook OB: only on the displacement bar of the prior candle (O(1), no nested scan)
+if useOb and close[1] < open[1] and close > high[1]
+    if array.size(boTop) >= maxZones
+        f_shift_zone(boTop, boBot, boBar, boLive, boBox)
+    array.push(boTop, open[1])
+    array.push(boBot, close[1])
+    array.push(boBar, bar_index - 1)
+    array.push(boLive, true)
+    array.push(boBox, box.new(bar_index - 1, open[1], bar_index + 2, close[1], bgcolor=color.new(#8a7a50, 93), border_color=color.new(#8a7a50, 65), border_width=1, border_style=line.style_dotted))
+
+if useOb and close[1] > open[1] and close < low[1]
+    if array.size(soTop) >= maxZones
+        f_shift_zone(soTop, soBot, soBar, soLive, soBox)
+    array.push(soTop, close[1])
+    array.push(soBot, open[1])
+    array.push(soBar, bar_index - 1)
+    array.push(soLive, true)
+    array.push(soBox, box.new(bar_index - 1, close[1], bar_index + 2, open[1], bgcolor=color.new(#8a7a50, 93), border_color=color.new(#8a7a50, 65), border_width=1, border_style=line.style_dotted))
+
+bullEntryNow = false
+bearEntryNow = false
+var int lastBullConf = 0
+var int lastBearConf = 0
+
+fvgHit = false
+obHit = false
+fvgHitS = false
+obHitS = false
+hitBfIdx = -1
+hitBoIdx = -1
+hitSfIdx = -1
+hitSoIdx = -1
+
+if bFibOn and not na(bEq)
+    inDisc = low <= bEq and high >= bFibLo
+    if useFvg
+        sz = array.size(bfLive)
+        if sz > 0
+            for i = 0 to sz - 1
+                if array.get(bfLive, i) and bar_index > array.get(bfBar, i)
+                    t = array.get(bfTop, i)
+                    b = array.get(bfBot, i)
+                    if b < bEq and t > bFibLo and low <= t and high >= b
+                        fvgHit := true
+                        hitBfIdx := i
+                        break
+    if useOb
+        sz = array.size(boLive)
+        if sz > 0
+            for i = 0 to sz - 1
+                if array.get(boLive, i) and bar_index > array.get(boBar, i)
+                    t = array.get(boTop, i)
+                    b = array.get(boBot, i)
+                    if b >= bFibLo and t <= bEq and low <= t and high >= b
+                        obHit := true
+                        hitBoIdx := i
+                        break
+    cond = needEither ? (fvgHit or obHit) : (fvgHit and obHit)
+    if inDisc and cond and close <= bEq and not bEntered
+        bEntered := true
+        bullEntryNow := true
+        confL = f_entry_conf(true, fvgHit, obHit)
+        lastBullConf := confL
+        f_push_ent(entLHist, label.new(bar_index, low, "ENT L · " + str.tostring(close, format.mintick) + "\n" + str.tostring(confL) + " " + f_conf_tag(confL),
+             style=label.style_label_up, color=color.new(#3dba7e, 0), textcolor=color.white, size=size.small))
+        if hitBfIdx >= 0
+            f_kill_zone(bfLive, bfBox, hitBfIdx)
+        if hitBoIdx >= 0
+            f_kill_zone(boLive, boBox, hitBoIdx)
+
+if sFibOn and not na(sEq)
+    inPrem = high >= sEq and low <= sFibHi
+    if useFvg
+        sz = array.size(sfLive)
+        if sz > 0
+            for i = 0 to sz - 1
+                if array.get(sfLive, i) and bar_index > array.get(sfBar, i)
+                    t = array.get(sfTop, i)
+                    b = array.get(sfBot, i)
+                    if t > sEq and b < sFibHi and high >= b and low <= t
+                        fvgHitS := true
+                        hitSfIdx := i
+                        break
+    if useOb
+        sz = array.size(soLive)
+        if sz > 0
+            for i = 0 to sz - 1
+                if array.get(soLive, i) and bar_index > array.get(soBar, i)
+                    t = array.get(soTop, i)
+                    b = array.get(soBot, i)
+                    if b >= sEq and t <= sFibHi and high >= b and low <= t
+                        obHitS := true
+                        hitSoIdx := i
+                        break
+    condS = needEither ? (fvgHitS or obHitS) : (fvgHitS and obHitS)
+    if inPrem and condS and close >= sEq and not sEntered
+        sEntered := true
+        bearEntryNow := true
+        confS = f_entry_conf(false, fvgHitS, obHitS)
+        lastBearConf := confS
+        f_push_ent(entSHist, label.new(bar_index, high, "ENT S · " + str.tostring(close, format.mintick) + "\n" + str.tostring(confS) + " " + f_conf_tag(confS),
+             style=label.style_label_down, color=color.new(#d4543c, 0), textcolor=color.white, size=size.small))
+        if hitSfIdx >= 0
+            f_kill_zone(sfLive, sfBox, hitSfIdx)
+        if hitSoIdx >= 0
+            f_kill_zone(soLive, soBox, hitSoIdx)
+
+// Maintain: expire / fill (extend boxes only on last bar — major speed win)
+f_maintain(tops, bots, bars, lives, boxes, isBullGap) =>
+    sz = array.size(lives)
+    if sz > 0
+        for i = 0 to sz - 1
+            if array.get(lives, i)
+                aged = bar_index - array.get(bars, i) > zoneKeep
+                filled = isBullGap ? close < array.get(bots, i) : close > array.get(tops, i)
+                if aged or filled
+                    f_kill_zone(lives, boxes, i)
+                else if barstate.islast
+                    box.set_right(array.get(boxes, i), bar_index + 2)
+
+f_maintain(bfTop, bfBot, bfBar, bfLive, bfBox, true)
+f_maintain(sfTop, sfBot, sfBar, sfLive, sfBox, false)
+f_maintain(boTop, boBot, boBar, boLive, boBox, true)
+f_maintain(soTop, soBot, soBar, soLive, soBox, false)
+
+plotshape(not cleanMode and bullFibNow, title="FIB L", style=shape.labelup, location=location.belowbar,
+     color=color.new(#e8a838, 0), text="FIB", textcolor=color.black, size=size.small)
+plotshape(not cleanMode and bullEntryNow, title="ENT L", style=shape.labelup, location=location.belowbar,
+     color=color.new(#3dba7e, 0), text="ENT L", textcolor=color.white, size=size.normal)
+plotshape(not cleanMode and bearFibNow, title="FIB S", style=shape.labeldown, location=location.abovebar,
+     color=color.new(#e8a838, 0), text="FIB", textcolor=color.black, size=size.small)
+plotshape(not cleanMode and bearEntryNow, title="ENT S", style=shape.labeldown, location=location.abovebar,
+     color=color.new(#d4543c, 0), text="ENT S", textcolor=color.white, size=size.normal)
+
+inBullIrl = bFibOn and not na(bEq) and close <= bEq and close >= bFibLo
+inBearIrl = sFibOn and not na(sEq) and close >= sEq and close <= sFibHi
+nowTxt = bullEntryNow ? "NOW · ENT L · " + str.tostring(close, format.mintick) + " · " + str.tostring(lastBullConf) : bearEntryNow ? "NOW · ENT S · " + str.tostring(close, format.mintick) + " · " + str.tostring(lastBearConf) : bFibOn ? (inBullIrl ? "NOW · IN ≤0.5\nwait virgin FVG/OB" : "NOW · FIB long\nwait ≤0.5") : sFibOn ? (inBearIrl ? "NOW · IN ≥0.5\nwait virgin FVG/OB" : "NOW · FIB short\nwait ≥0.5") : bBos ? "NOW · struct↑\nwait post-SH Fib" : sBos ? "NOW · struct↓\nwait post-SL Fib" : "NOW · FLAT"
+nowTxt := nowTxt + "\n" + biasTxt
+
+bgcolor(highlightNow and barstate.islast and bFibOn ? color.new(#3dba7e, inBullIrl ? 85 : 93) : na)
+bgcolor(highlightNow and barstate.islast and sFibOn ? color.new(#d4543c, inBearIrl ? 85 : 93) : na)
+
+if barstate.islast and highlightNow
+    if not na(nowBadge)
+        label.delete(nowBadge)
+    nowBadge := label.new(bar_index + 1, close, nowTxt, style=label.style_label_left,
+         color=bFibOn or bullEntryNow ? color.new(#3dba7e, 15) : sFibOn or bearEntryNow ? color.new(#d4543c, 15) : color.new(#161411, 10),
+         textcolor=color.white, size=size.normal)
+
+var table info = table.new(position.top_right, 2, 8, bgcolor=color.new(#0c0b0a, 5), border_width=1)
+if barstate.islast
+    table.cell(info, 0, 0, "LEDGER", text_color=#e8a838, text_size=size.normal)
+    table.cell(info, 1, 0, "v0.5.6", text_color=color.gray, text_size=size.small)
+    st = bullEntryNow ? "ENTRY L" : bearEntryNow ? "ENTRY S" : bFibOn ? "FIB L" : sFibOn ? "FIB S" : bBos ? (bIsMss ? "MSS↑" : "BOS↑") : sBos ? (sIsMss ? "MSS↓" : "BOS↓") : "FLAT"
+    table.cell(info, 0, 1, "NOW", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 1, st, text_color=color.white, text_size=size.normal)
+    biasCol = biasDir == 1 ? color.new(#3dba7e, 0) : biasDir == -1 ? color.new(#d4543c, 0) : color.new(#e8a838, 0)
+    table.cell(info, 0, 2, "BIAS", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 2, biasTxt, text_color=biasCol, text_size=size.tiny)
+    yDbg = na(dC1) ? "—" : (isBullD ? "Y green " : isBearD ? "Y red " : "Y flat ") + (pdlSweep ? "PDL " : "") + (pdhSweep ? "PDH" : "")
+    table.cell(info, 0, 3, "D-1", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 3, yDbg, text_color=color.white, text_size=size.tiny)
+    table.cell(info, 0, 4, "0.5", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 4, bFibOn ? str.tostring(bEq, format.mintick) : sFibOn ? str.tostring(sEq, format.mintick) : "—", text_color=#e8a838, text_size=size.small)
+    table.cell(info, 0, 5, "Swing", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 5, str.tostring(swingLen) + " / " + str.tostring(minSwingAtr, "#.#") + "ATR", text_color=color.white, text_size=size.tiny)
+    table.cell(info, 0, 6, "Clean", text_color=color.gray, text_size=size.small)
+    table.cell(info, 1, 6, cleanMode ? "ON" : "OFF", text_color=color.white, text_size=size.small)
+
+sym = symbolOverride == "" ? syminfo.ticker : symbolOverride
+
+if alertOnBos and bullBosNow
+    alert('{"secret":"' + alertSecret + '","stage":"SETUP_ARMED","symbol":"' + sym + '","side":"long","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"bias":"' + biasTxt + '","message":"Structure↑ confirm — wait post-SH Fib then ≤0.5 FVG/OB"}', alert.freq_once_per_bar_close)
+if alertOnBos and bearBosNow
+    alert('{"secret":"' + alertSecret + '","stage":"SETUP_ARMED","symbol":"' + sym + '","side":"short","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"bias":"' + biasTxt + '","message":"Structure↓ confirm — wait post-SL Fib then ≥0.5 FVG/OB"}', alert.freq_once_per_bar_close)
+
+if bullFibNow
+    alert('{"secret":"' + alertSecret + '","stage":"SETUP_ARMED","symbol":"' + sym + '","side":"long","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"bias":"' + biasTxt + '","message":"Fib ready — wait ≤0.5 with 1H FVG/OB"}', alert.freq_once_per_bar_close)
+if bearFibNow
+    alert('{"secret":"' + alertSecret + '","stage":"SETUP_ARMED","symbol":"' + sym + '","side":"short","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"bias":"' + biasTxt + '","message":"Fib ready — wait ≥0.5 with 1H FVG/OB"}', alert.freq_once_per_bar_close)
+
+if bullEntryNow
+    alert('{"secret":"' + alertSecret + '","stage":"ENTRY_READY","symbol":"' + sym + '","side":"long","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"confidence":' + str.tostring(lastBullConf) + ',"bias":"' + biasTxt + '","message":"1H ENTRY L conf=' + str.tostring(lastBullConf) + '"}', alert.freq_once_per_bar_close)
+if bearEntryNow
+    alert('{"secret":"' + alertSecret + '","stage":"ENTRY_READY","symbol":"' + sym + '","side":"short","timeframe":"' + timeframe.period + '","price":' + str.tostring(close) + ',"confidence":' + str.tostring(lastBearConf) + ',"bias":"' + biasTxt + '","message":"1H ENTRY S conf=' + str.tostring(lastBearConf) + '"}', alert.freq_once_per_bar_close)
+
+alertcondition(bullBosNow, "BOS/MSS Long", "Structure long confirm")
+alertcondition(bearBosNow, "BOS/MSS Short", "Structure short confirm")
+alertcondition(bullFibNow, "Fib Long ready", "Fib long ready")
+alertcondition(bearFibNow, "Fib Short ready", "Fib short ready")
+alertcondition(bullEntryNow, "Entry 1H Long", "1H entry long")
+alertcondition(bearEntryNow, "Entry 1H Short", "1H entry short")

@@ -68,6 +68,19 @@ export function AlertFeed() {
                 {a.symbol} · {a.side} · {a.timeframe}
                 {a.price != null ? ` · ${a.price}` : ""}
               </strong>
+              {a.sl != null || a.tp != null || a.qty != null ? (
+                <p className="alert-meta">
+                  {[
+                    a.qty != null ? `qty ${a.qty}` : null,
+                    a.sl != null ? `sl ${a.sl}` : null,
+                    a.tp != null ? `tp ${a.tp}` : null,
+                    a.orderType ?? null,
+                    a.trail ? "trail" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
               {a.message ? <p>{a.message}</p> : null}
             </li>
           ))}

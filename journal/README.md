@@ -26,7 +26,13 @@ Open [http://localhost:3000](http://localhost:3000).
 | `JOURNAL_FORCE_DEMO` | `1`이면 항상 데모 |
 | `SITE_PASSWORD` | Vercel 접속 잠금 |
 | `TV_WEBHOOK_SECRET` | TradingView webhook 인증 |
+| `BITGET_EXECUTE` | `off` / `dry_run` / `live` — TV→Bitget order bridge |
+| `BITGET_ACCOUNT_USDT` | live wallet base, default `100` |
+| `BITGET_LEVERAGE_MAX` | default `80` (full $500 loss on $100 needs ~500x) |
+| `BITGET_TARGET_SL_USD` / `BITGET_TARGET_TP_USD` | price distances, default `500` / `1100` |
+| `BITGET_SL_PCT` / `BITGET_TP_PCT` | cash risk/reward % of sized base when TARGET_*_USD=0 (`5` / `11`) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 셋업 푸시 |
+| `DISCORD_WEBHOOK_URL` | Discord channel webhook 푸시 |
 | `R2_*` | 스크린샷 + 저널 JSON 영구 저장 ([R2 doc](../docs/R2-STORAGE.md)) |
 | `R2_DATA_BUCKET` | (선택) 비공개 버킷 — 저널 JSON 전용 |
 
@@ -46,13 +52,13 @@ See [`../docs/BITGET-MCP.md`](../docs/BITGET-MCP.md). LEDGER sync uses `@bitget-
 
 저널/복기 데이터는 로컬에서 `journal/data/*.json`에 저장됩니다. Vercel `/tmp`는 임시입니다. 스크린샷은 [Cloudflare R2](../docs/R2-STORAGE.md)를 권장합니다.
 
-## TradingView alerts
+## TradingView → Bitget bridge
 
-장중 알림은 Bitget이 아니라 **TradingView webhook** → `/api/tv-webhook` → 대시보드 + (선택) Telegram.
+**TradingView strategy alert** → `/api/tv-webhook` → dashboard + Telegram → optional Bitget `placeOrder` (qty / price / SL / TP / trailing).
 
-See [`../docs/TV-WEBHOOK.md`](../docs/TV-WEBHOOK.md).
+Default `BITGET_EXECUTE=off` (alerts only). Use `dry_run` before `live`.
 
-Stages: `SETUP_ARMED` (1H) → `ENTRY_READY` (5m) → optional `INVALID`.
+Starter live pack: **100 USDT margin × 20x**, SL **5%** / TP **10%** of price (app-side; Pine only fires the signal). See [`../docs/TV-WEBHOOK.md`](../docs/TV-WEBHOOK.md).
 
 ## Vercel
 

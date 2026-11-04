@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { addAlert } from "@/lib/alert-store";
+import { maybeExecuteBitget } from "@/lib/bitget-exec";
+import { notifyDiscord } from "@/lib/discord";
 import { notifyTelegram } from "@/lib/telegram";
 import {
   parseTradingViewPayload,
@@ -36,7 +38,15 @@ export async function POST(request: Request) {
 
   const parsed = parseTradingViewPayload(raw);
   const alert = await addAlert(parsed);
-  const telegram = await notifyTelegram(alert).catch(() => false);
+  const exec = await maybeExecuteBitget(alert).catch((e: unknown) => ({
+    mode: "off" as const,
+    attempted: false,
+    error: e instanceof Error ? e.message : String(e),
+  }));
+  const [telegram, discord] = await Promise.all([
+    notifyTelegram(alert, exec).catch(() => false),
+    notifyDiscord(alert, exec).catch(() => false),
+  ]);
 
-  return NextResponse.json({ ok: true, alert, telegram });
+  return NextResponse.json({ ok: true, alert, telegram, discord, exec });
 }

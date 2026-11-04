@@ -1,6 +1,15 @@
 # Local Bitget MCP credentials (copy from mcp.json.example)
 .cursor/mcp.json
 
+# Parity viz generated snapshot
+journal/tools/parity_viz/data.json
+
 # OS / editor
 .DS_Store
 *.pem
+.vercel
+
+# Journal research tooling artifacts
+journal/tools/data/
+journal/tools/out/
+journal/tools/**/__pycache__/

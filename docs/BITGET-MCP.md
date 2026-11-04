@@ -46,9 +46,13 @@ BITGET_API_KEY=...
 BITGET_SECRET_KEY=...
 BITGET_PASSPHRASE=...
 DEFAULT_RISK_USD=25
+# TV → Bitget bridge (default off). See docs/TV-WEBHOOK.md
+BITGET_EXECUTE=off
 ```
 
 Then open the app and click **Sync Bitget**.
+
+For **live** webhook execution (`BITGET_EXECUTE=live`), the API key needs futures **trade** permission (not read-only). Prefer `dry_run` + demo keys first.
 
 ## Useful MCP prompts for your ICT journal
 

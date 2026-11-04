@@ -67,6 +67,10 @@ export type AlertStage = "SETUP_ARMED" | "ENTRY_READY" | "INVALID";
 
 export type AlertSide = "long" | "short" | "unknown";
 
+export type AlertAction = "enter" | "flatten" | "none";
+
+export type AlertOrderType = "market" | "limit";
+
 export interface SetupAlert {
   id: string;
   stage: AlertStage;
@@ -77,6 +81,20 @@ export interface SetupAlert {
   message: string;
   source: "tradingview";
   createdAt: number;
+  /** Bridge fields from Pine strategy webhook (optional). */
+  action?: AlertAction;
+  entry?: number | null;
+  sl?: number | null;
+  tp?: number | null;
+  qty?: number | null;
+  riskUsd?: number | null;
+  orderType?: AlertOrderType;
+  clientOid?: string | null;
+  trail?: boolean;
+  trailActivate?: number | null;
+  trailRatio?: number | null;
+  confidence?: number | null;
+  bias?: string | null;
 }
 
 export interface ReviewResult {

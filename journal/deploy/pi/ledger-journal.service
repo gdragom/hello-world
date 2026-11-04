@@ -1,0 +1,19 @@
+[Unit]
+Description=LEDGER ICT journal (Next.js TV→Bitget bridge)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/hello-world/journal
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=0.0.0.0
+# Loads Next env from .env.local in WorkingDirectory via next start
+ExecStart=/usr/bin/npm run start -- -H 0.0.0.0 -p 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
