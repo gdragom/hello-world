@@ -153,8 +153,8 @@ def make_params(side: str, swing, atr, fib, wick, bias_mode: str) -> Params:
         entry_mode=FIXED["entry_mode"],  # type: ignore
         bias_filter=FIXED["bias_filter"],  # type: ignore
         short_filter="long_only" if is_long else "match",  # type: ignore
-        fixed_usd_sl=500.0 if is_long else 1000.0,
-        fixed_tp_usd=1000.0 if is_long else 2100.0,
+        fixed_usd_sl=500.0 if is_long else 750.0,
+        fixed_tp_usd=1000.0 if is_long else 1500.0,
         fixed_risk_usd=FIXED["fixed_risk_usd"],
         zone_keep=FIXED["zone_keep"],
         max_zones=FIXED["max_zones"],

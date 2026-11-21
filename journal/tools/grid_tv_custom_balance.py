@@ -83,7 +83,7 @@ def run_one(side, h1, start_i, ifvg, job):
         short_filter="long_only" if is_long else "match",  # type: ignore
         rr_mult=2.0,
         sl_mode="fixed_usd",
-        fixed_usd_sl=500.0 if is_long else 1000.0,
+        fixed_usd_sl=500.0 if is_long else 750.0,
         zone_keep=80,
         max_zones=12,
         reenter=REENTER,
@@ -98,7 +98,7 @@ def run_one(side, h1, start_i, ifvg, job):
         initial_capital=10_000.0,
         eq_wick=bool(wick),
         use_fixed_dollar=True,
-        fixed_tp_usd=1000.0 if is_long else 2100.0,
+        fixed_tp_usd=1000.0 if is_long else 1500.0,
         fixed_risk_usd=500.0,
         allow_long=is_long,
     )
@@ -223,7 +223,7 @@ def main() -> int:
             [
                 {"item": "window", "value": f"last {days}d Bitget 1H"},
                 {"item": "long_book", "value": "SL$500 TP$1000 risk$500"},
-                {"item": "short_book", "value": "SL$1000 TP$2100 risk$500"},
+                {"item": "short_book", "value": "SL$750 TP$1500 risk$500"},
                 {"item": "fixed", "value": "cool10 post10 reenter True IFVG 1m/12"},
                 {
                     "item": "balance_score",

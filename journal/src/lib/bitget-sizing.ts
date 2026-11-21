@@ -34,7 +34,7 @@ export type LivePack = {
   tpPct: number;
   /**
    * Price-distance targets (fallback when alert has no sl/tp).
-   * Long TV Fixed: SL $500 / TP $1100. Short Fixed: SL $1000 / TP $2100.
+   * Long TV Fixed: SL $500 / TP $1100. Short Fixed: SL $750 / TP $1500.
    */
   targetSlUsd: number;
   targetTpUsd: number;
@@ -60,8 +60,8 @@ export function targetDistancesForSide(side?: AlertSide | null): {
   // Short must not inherit shared BITGET_TARGET_*_USD=500/1100 from Long packs.
   if (side === "short") {
     return {
-      targetSlUsd: numEnv("BITGET_TARGET_SL_USD_SHORT", 1000),
-      targetTpUsd: numEnv("BITGET_TARGET_TP_USD_SHORT", 2100),
+      targetSlUsd: numEnv("BITGET_TARGET_SL_USD_SHORT", 750),
+      targetTpUsd: numEnv("BITGET_TARGET_TP_USD_SHORT", 1500),
     };
   }
   return {
@@ -79,7 +79,7 @@ export function targetDistancesForSide(side?: AlertSide | null): {
 /**
  * Starter pack from env. Pass `liveEquityUsdt` (Bitget wallet) so each trade
  * tiers size (200 / 300 / 400…) and sizes SL/TP off that base.
- * Pass `side` so Short uses SL $1000 / TP $2100 when alert prices are missing.
+ * Pass `side` so Short uses SL $750 / TP $1500 when alert prices are missing.
  */
 export function livePackFromEnv(
   liveEquityUsdt?: number | null,
@@ -133,8 +133,8 @@ function clamp(n: number, lo: number, hi: number): number {
 
 /**
  * Live sizing from the TV Fixed pack.
- * Long: SL $500 / TP $1100. Short: SL $1000 / TP $2100 (risk cash still SL_PCT of base).
- * On a $100 wallet, default 5% risk → $5 cash SL; Short qty ≈ 0.005 vs Long ≈ 0.01
+ * Long: SL $500 / TP $1100. Short: SL $750 / TP $1500 (risk cash still SL_PCT of base).
+ * On a $100 wallet, default 5% risk → $5 cash SL; Short qty ≈ 0.0067 vs Long ≈ 0.01
  * at those price distances. Alert sl/tp prices override env targets when present.
  */
 export function planLiveOrder(

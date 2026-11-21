@@ -30,7 +30,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `BITGET_ACCOUNT_USDT` | live wallet base, default `100` |
 | `BITGET_LEVERAGE_MAX` | default `80` (full $500 loss on $100 needs ~500x) |
 | `BITGET_TARGET_SL_USD_LONG` / `_TP_USD_LONG` | Long price distances, default `500` / `1100` |
-| `BITGET_TARGET_SL_USD_SHORT` / `_TP_USD_SHORT` | Short price distances, default `1000` / `2100` |
+| `BITGET_TARGET_SL_USD_SHORT` / `_TP_USD_SHORT` | Short price distances, default `750` / `1500` |
 | `BITGET_SL_PCT` / `BITGET_TP_PCT` | cash risk/reward % of sized base when TARGET_*_USD=0 (`5` / `11`) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 셋업 푸시 |
 | `DISCORD_WEBHOOK_URL` | Discord channel webhook 푸시 |

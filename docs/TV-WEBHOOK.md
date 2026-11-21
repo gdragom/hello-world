@@ -19,7 +19,7 @@ Pine strategy alert (ENTRY_READY + entry/sl/tp/qty)
   → maybeExecuteBitget (off | dry_run | live)
 ```
 
-## Pine setup (Long v0.9.16 / Short v0.9.17)
+## Pine setup (Long v0.9.16 / Short v0.9.18)
 
 1. Paste `LEDGER_ICT_Strategy_Long.pine` or `…_Short.pine` on BTCUSDT.P **1H**.
 2. Set **TV_WEBHOOK_SECRET** input to the same value as Vercel / Pi `TV_WEBHOOK_SECRET`.
@@ -31,7 +31,7 @@ Pine strategy alert (ENTRY_READY + entry/sl/tp/qty)
 | Side | SL $ | Risk $ | TP $ | Qty |
 |------|------|--------|------|-----|
 | Long | 500 | 500 | 1100 | 1.0 |
-| Short | **1000** | 500 | **2100** | **0.5** |
+| Short | **750** | 500 | **1500** | **≈0.667** |
 
 Webhook `ENTRY_READY` includes `sl` / `tp` prices; Pi sizes cash risk from `BITGET_SL_PCT` × wallet tier and uses those price distances.
 
@@ -98,7 +98,7 @@ Cash risk still **5%** of wallet tier (`BITGET_SL_PCT`). Price distances follow 
 | Side | $10k Fixed | $100 cash risk | Approx qty @ BTC $100k |
 |------|------------|----------------|-------------------------|
 | Long | SL $500 / TP $1100 | **$5** | **~0.01** |
-| Short | SL **$1000** / TP **$2100** | **$5** | **~0.005** |
+| Short | SL **$750** / TP **$1500** | **$5** | **~0.0067** |
 
 ```bash
 BITGET_EXECUTE=dry_run
@@ -114,8 +114,8 @@ BITGET_TARGET_REWARD_USD=0
 # Fallbacks when alert has no sl/tp (side-specific wins)
 BITGET_TARGET_SL_USD_LONG=500
 BITGET_TARGET_TP_USD_LONG=1100
-BITGET_TARGET_SL_USD_SHORT=1000
-BITGET_TARGET_TP_USD_SHORT=2100
+BITGET_TARGET_SL_USD_SHORT=750
+BITGET_TARGET_TP_USD_SHORT=1500
 BITGET_LEVERAGE_MAX=20
 BITGET_MAX_QTY=5
 ```
@@ -142,8 +142,8 @@ BITGET_TARGET_RISK_USD=0
 BITGET_TARGET_REWARD_USD=0
 BITGET_TARGET_SL_USD_LONG=500
 BITGET_TARGET_TP_USD_LONG=1100
-BITGET_TARGET_SL_USD_SHORT=1000
-BITGET_TARGET_TP_USD_SHORT=2100
+BITGET_TARGET_SL_USD_SHORT=750
+BITGET_TARGET_TP_USD_SHORT=1500
 BITGET_LEVERAGE=10
 BITGET_LEVERAGE_MAX=20
 BITGET_MAX_QTY=5
@@ -158,9 +158,9 @@ Use a Bitget API key with **futures trade** permission only when you switch to `
 
 1. **Bitget** — Fund futures wallet **$100 USDT**. Create API key (futures trade; IP-restrict to Pi/Vercel).
 2. **Host LEDGER** — Pi or Vercel; copy `.env.example` → `.env.local` with the pack above; `BITGET_EXECUTE=dry_run` first. HTTPS URL required for TV (Cloudflare Tunnel / Tailscale Funnel / Vercel).
-3. **Pine Long / Short** — Paste on **BTCUSDT.P 1H**: Long Fixed SL $500 / TP $1100; Short Fixed **SL $1000 / TP $2100** (risk $500). Set **TV_WEBHOOK_SECRET**.
+3. **Pine Long / Short** — Paste on **BTCUSDT.P 1H**: Long Fixed SL $500 / TP $1100; Short Fixed **SL $750 / TP $1500** (risk $500, 1:2). Set **TV_WEBHOOK_SECRET**.
 4. **TV alerts** — Each strategy: condition **Any alert() function call** → Webhook URL `https://YOUR_HOST/api/tv-webhook`. Message body empty.
-5. **Dry-run proof** — Wait for an alert or POST a test `ENTRY_READY` JSON. Long ~qty `0.01`; Short ~qty `0.005`; cash risk ~`$5`.
+5. **Dry-run proof** — Wait for an alert or POST a test `ENTRY_READY` JSON. Long ~qty `0.01`; Short ~qty `0.0067`; cash risk ~`$5`.
 6. **Go live** — Set `BITGET_EXECUTE=live`, restart / redeploy.
 
 ## Discord

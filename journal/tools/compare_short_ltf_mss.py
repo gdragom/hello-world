@@ -31,7 +31,7 @@ def pack_short() -> Params:
         short_filter="match",
         rr_mult=2.0,
         sl_mode="fixed_usd",
-        fixed_usd_sl=1000.0,
+        fixed_usd_sl=750.0,
         zone_keep=60,
         max_zones=12,
         reenter=True,
@@ -46,7 +46,7 @@ def pack_short() -> Params:
         initial_capital=10_000.0,
         eq_wick=True,
         use_fixed_dollar=True,
-        fixed_tp_usd=2100.0,
+        fixed_tp_usd=1500.0,
         fixed_risk_usd=500.0,
         allow_long=False,
     )
