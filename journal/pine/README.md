@@ -6,7 +6,7 @@
 | `LEDGER_ICT_Strategy_v0.6.pine` | Strategy **both sides** v0.8.8 |
 | `LEDGER_ICT_Strategy_Long.pine` | BTC Strategy **LONG only** v0.9.16 (SMA 7/14 ON, FVG **or** OB, Fixed $500/$1100) |
 | `LEDGER_ICT_Strategy_Long_v0.9.8.pine` | BTC Long **v0.9.8 snapshot** — Deep pack, **no SMA gate**, FVG **or** OB, IFVG@6, Fixed $500/$1000 |
-| `LEDGER_ICT_Strategy_Short.pine` | BTC Strategy **SHORT only** v0.9.16 (SMA 7/14 ON, FVG **or** OB, Fixed $500/$1100) |
+| `LEDGER_ICT_Strategy_Short.pine` | BTC Strategy **SHORT only** v0.9.17 (SMA 7/14 ON, FVG **or** OB, Fixed **$1000/$2100**, risk $500) |
 | `LEDGER_ICT_Strategy_Long_Gold.pine` | **XAUUSD LONG** v0.1 (Custom pack) |
 | `LEDGER_ICT_Strategy_Short_Gold.pine` | **XAUUSD SHORT** v0.1 (Custom pack) |
 | `../tools/optimize_ledger.py` | Local grid / walk-forward |
@@ -48,9 +48,9 @@ Chart TF **1H**. Defaults = your TV Inputs screenshots.
 | LTF | 5m IFVG age **6** · wick ≤0.5 |
 | Exits | Fixed **SL $500** · risk **$500** · TP **$1100** |
 
-**Short v0.9.16:** same pack as Long · only short if daily close **<** SMA 7 and 14 · Fixed **$500 / $1100**.
+**Short v0.9.17:** same structure pack as Long · only short if daily close **<** SMA 7 and 14 · Fixed **SL $1000 / risk $500 / TP $2100** (qty 0.5 on $10k, ~2.1R).
 Live Bitget: see [`../../docs/TV-WEBHOOK.md`](../../docs/TV-WEBHOOK.md).
-Panel: `0.9.16 LONG` / `0.9.16 SHORT`.
+Panel: `0.9.16 LONG` / `0.9.17 SHORT`.
 
 ## Optimizer
 

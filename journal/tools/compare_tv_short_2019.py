@@ -47,7 +47,7 @@ def pack(*, long: bool) -> Params:
         initial_capital=10_000.0,
         eq_wick=True,
         use_fixed_dollar=True,
-        fixed_tp_usd=1000.0 if long else 2000.0,
+        fixed_tp_usd=1000.0 if long else 2100.0,
         fixed_risk_usd=500.0,
         allow_long=long,
     )
@@ -116,7 +116,7 @@ def main() -> int:
     print(f"M5 {len(m5)} {m5.index.min()} .. {m5.index.max()}", flush=True)
     print(
         "Pack: sw8 a0.6 immediate zone_fvg_ob aligned wick c10/10 "
-        "ifvg5m@6 zoneKeep60 | Long SL500/TP1000 | Short SL1000/TP2000",
+        "ifvg5m@6 zoneKeep60 | Long SL500/TP1000 | Short SL1000/TP2100",
         flush=True,
     )
 

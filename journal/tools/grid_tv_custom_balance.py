@@ -98,7 +98,7 @@ def run_one(side, h1, start_i, ifvg, job):
         initial_capital=10_000.0,
         eq_wick=bool(wick),
         use_fixed_dollar=True,
-        fixed_tp_usd=1000.0 if is_long else 2000.0,
+        fixed_tp_usd=1000.0 if is_long else 2100.0,
         fixed_risk_usd=500.0,
         allow_long=is_long,
     )
@@ -223,7 +223,7 @@ def main() -> int:
             [
                 {"item": "window", "value": f"last {days}d Bitget 1H"},
                 {"item": "long_book", "value": "SL$500 TP$1000 risk$500"},
-                {"item": "short_book", "value": "SL$1000 TP$2000 risk$500"},
+                {"item": "short_book", "value": "SL$1000 TP$2100 risk$500"},
                 {"item": "fixed", "value": "cool10 post10 reenter True IFVG 1m/12"},
                 {
                     "item": "balance_score",

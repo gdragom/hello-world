@@ -103,7 +103,7 @@ async function resolvePlan(
       sized.qty = riskOverride / Math.abs(entry - sl);
     }
   }
-  const plan = planLiveOrder(sized, livePackFromEnv(liveEquityUsdt));
+  const plan = planLiveOrder(sized, livePackFromEnv(liveEquityUsdt, sized.side));
   if ("error" in plan) return plan;
   const maxQty = numEnv("BITGET_MAX_QTY", 5);
   if (plan.qty > maxQty) {

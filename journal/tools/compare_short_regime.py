@@ -49,7 +49,7 @@ def pack_short() -> Params:
         initial_capital=10_000.0,
         eq_wick=True,
         use_fixed_dollar=True,
-        fixed_tp_usd=2000.0,
+        fixed_tp_usd=2100.0,
         fixed_risk_usd=500.0,
         allow_long=False,
     )

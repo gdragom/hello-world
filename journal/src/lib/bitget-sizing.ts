@@ -32,7 +32,10 @@ export type LivePack = {
   leverage: number;
   slPct: number;
   tpPct: number;
-  /** Price-distance targets. TV Fixed: SL $500, TP $1100 (risk $500 / reward $1100 at qty 1). */
+  /**
+   * Price-distance targets (fallback when alert has no sl/tp).
+   * Long TV Fixed: SL $500 / TP $1100. Short Fixed: SL $1000 / TP $2100.
+   */
   targetSlUsd: number;
   targetTpUsd: number;
   /** Cash loss / gain. 0 = use slPct/tpPct of sized base (5%/11% on $100 → $5/$11). */
@@ -49,11 +52,39 @@ export function tierSizedBase(equityUsdt: number): number {
   return Math.max(min, stepped);
 }
 
+/** TV Fixed price distances by side (overridable via env). */
+export function targetDistancesForSide(side?: AlertSide | null): {
+  targetSlUsd: number;
+  targetTpUsd: number;
+} {
+  // Short must not inherit shared BITGET_TARGET_*_USD=500/1100 from Long packs.
+  if (side === "short") {
+    return {
+      targetSlUsd: numEnv("BITGET_TARGET_SL_USD_SHORT", 1000),
+      targetTpUsd: numEnv("BITGET_TARGET_TP_USD_SHORT", 2100),
+    };
+  }
+  return {
+    targetSlUsd: numEnv(
+      "BITGET_TARGET_SL_USD_LONG",
+      numEnv("BITGET_TARGET_SL_USD", 500)
+    ),
+    targetTpUsd: numEnv(
+      "BITGET_TARGET_TP_USD_LONG",
+      numEnv("BITGET_TARGET_TP_USD", 1100)
+    ),
+  };
+}
+
 /**
  * Starter pack from env. Pass `liveEquityUsdt` (Bitget wallet) so each trade
  * tiers size (200 / 300 / 400…) and sizes SL/TP off that base.
+ * Pass `side` so Short uses SL $1000 / TP $2100 when alert prices are missing.
  */
-export function livePackFromEnv(liveEquityUsdt?: number | null): LivePack {
+export function livePackFromEnv(
+  liveEquityUsdt?: number | null,
+  side?: AlertSide | null
+): LivePack {
   const marginEnv = numEnv("BITGET_MARGIN_USDT", 0);
   const accountEnv = numEnv("BITGET_ACCOUNT_USDT", 100);
   const live =
@@ -63,6 +94,7 @@ export function livePackFromEnv(liveEquityUsdt?: number | null): LivePack {
   const equityUsdt = live > 0 ? live : accountEnv > 0 ? accountEnv : marginEnv;
   const sizedBaseUsdt =
     marginEnv > 0 ? marginEnv : tierSizedBase(equityUsdt > 0 ? equityUsdt : accountEnv);
+  const { targetSlUsd, targetTpUsd } = targetDistancesForSide(side);
   return {
     equityUsdt: equityUsdt > 0 ? equityUsdt : sizedBaseUsdt,
     sizedBaseUsdt,
@@ -70,8 +102,8 @@ export function livePackFromEnv(liveEquityUsdt?: number | null): LivePack {
     leverage: numEnv("BITGET_LEVERAGE", 10),
     slPct: numEnv("BITGET_SL_PCT", 5),
     tpPct: numEnv("BITGET_TP_PCT", 11),
-    targetSlUsd: numEnv("BITGET_TARGET_SL_USD", 500),
-    targetTpUsd: numEnv("BITGET_TARGET_TP_USD", 1100),
+    targetSlUsd,
+    targetTpUsd,
     targetRiskUsd: numEnv("BITGET_TARGET_RISK_USD", 0),
     targetRewardUsd: numEnv("BITGET_TARGET_REWARD_USD", 0),
   };
@@ -100,13 +132,14 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 /**
- * Live sizing from the TV Fixed pack (SL $500 price, risk $500, TP $1100 on $10k).
- * On a $100 wallet, default 5%/11% of base → cash risk $5 / reward $11, same price
- * distances, ~10x at BTC $100k. Leverage is capped (default 20x).
+ * Live sizing from the TV Fixed pack.
+ * Long: SL $500 / TP $1100. Short: SL $1000 / TP $2100 (risk cash still SL_PCT of base).
+ * On a $100 wallet, default 5% risk → $5 cash SL; Short qty ≈ 0.005 vs Long ≈ 0.01
+ * at those price distances. Alert sl/tp prices override env targets when present.
  */
 export function planLiveOrder(
   alert: Pick<SetupAlert, "side" | "entry" | "price" | "sl" | "tp" | "qty">,
-  pack = livePackFromEnv()
+  pack = livePackFromEnv(undefined, alert.side)
 ): LivePlan | { error: string } {
   const entry = alert.entry ?? alert.price;
   if (entry == null || !Number.isFinite(entry) || entry <= 0) {
